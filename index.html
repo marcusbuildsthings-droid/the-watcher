@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Watcher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0a0a0a;
+            color: #c4c4c4;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+        }
+        
+        .glitch {
+            animation: glitch 0.3s infinite;
+        }
+        
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        
+        .story-text {
+            line-height: 1.8;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            opacity: 0;
+            animation: fadeIn 2s forwards;
+        }
+        
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        
+        .choice-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 40px;
+        }
+        
+        .choice {
+            background: transparent;
+            border: 1px solid #333;
+            color: #888;
+            padding: 15px 20px;
+            font-family: inherit;
+            font-size: 1em;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .choice:hover {
+            border-color: #666;
+            color: #c4c4c4;
+            background: rgba(255,255,255,0.02);
+        }
+        
+        .choice:hover::before {
+            content: '> ';
+        }
+        
+        .choice.wrong {
+            animation: wrongChoice 0.5s ease;
+            border-color: #440000;
+        }
+        
+        @keyframes wrongChoice {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .static-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><filter id="noise"><feTurbulence baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.15"/></svg>');
+            z-index: 1000;
+            transition: opacity 0.3s;
+        }
+        
+        .static-overlay.active {
+            opacity: 0.3;
+        }
+        
+        .timestamp {
+            color: #444;
+            font-size: 0.8em;
+            margin-bottom: 20px;
+        }
+        
+        .redacted {
+            background: #c4c4c4;
+            color: #c4c4c4;
+            padding: 0 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .redacted:hover {
+            background: #440000;
+            color: #ff6666;
+        }
+        
+        .corruption {
+            color: #440000;
+            font-size: 0.6em;
+            opacity: 0.5;
+        }
+        
+        .watcher-eye {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            background: #ff0000;
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 999;
+            transition: opacity 2s;
+            box-shadow: 0 0 10px #ff0000;
+        }
+        
+        .watcher-eye.visible {
+            opacity: 0.6;
+        }
+        
+        .title {
+            font-size: 2em;
+            color: #666;
+            margin-bottom: 40px;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+        }
+        
+        .subtle-message {
+            position: fixed;
+            color: #1a1a1a;
+            font-size: 0.7em;
+            pointer-events: none;
+            user-select: none;
+        }
+        
+        .input-field {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #333;
+            color: #c4c4c4;
+            font-family: inherit;
+            font-size: 1em;
+            padding: 5px 0;
+            width: 200px;
+            outline: none;
+        }
+        
+        .input-field:focus {
+            border-color: #666;
+        }
+        
+        .ending {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .ending h2 {
+            color: #440000;
+            margin-bottom: 30px;
+        }
+        
+        .restart-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #666;
+            padding: 10px 30px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .restart-btn:hover {
+            border-color: #666;
+            color: #c4c4c4;
+        }
+        
+        .typing-cursor {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        /* Creepy scroll bar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #222;
+        }
+    </style>
+</head>
+<body>
+    <div class="static-overlay" id="static"></div>
+    <div class="watcher-eye" id="eye"></div>
+    
+    <div class="container">
+        <div id="content">
+            <!-- Content injected by JS -->
+        </div>
+    </div>
+    
+    <script>
+        // State
+        let playerName = '';
+        let storyPath = [];
+        let watcherAwareness = 0;
+        let hasTypedName = false;
+        
+        // Time-based horror
+        const hour = new Date().getHours();
+        const isLateNight = hour >= 23 || hour < 5;
+        const isWitchingHour = hour >= 2 && hour < 4;
+        
+        // Creepy names and places generated procedurally
+        const names = ['Sarah', 'Michael', 'Emma', 'David', 'Rachel', 'James', 'Laura', 'Thomas'];
+        const places = ['Millbrook', 'Ashford', 'Ravenwood', 'Coldwater', 'Blackhaven', 'Thornfield'];
+        const getRandomName = () => names[Math.floor(Math.random() * names.length)];
+        const getRandomPlace = () => places[Math.floor(Math.random() * places.length)];
+        
+        // Story data
+        const victimsName = getRandomName();
+        const townName = getRandomPlace();
+        
+        const stories = {
+            intro: {
+                text: () => `
+                    <div class="timestamp">Session started: ${new Date().toLocaleString()}</div>
+                    <p class="story-text">Before we begin, I need to know who's reading.</p>
+                    <p class="story-text" style="animation-delay: 1s">What should I call you?</p>
+                    <div class="choice-container">
+                        <input type="text" class="input-field" id="nameInput" placeholder="Enter your name" maxlength="20" autocomplete="off">
+                    </div>
+                `,
+                setup: () => {
+                    setTimeout(() => {
+                        const input = document.getElementById('nameInput');
+                        if (input) {
+                            input.focus();
+                            input.addEventListener('keypress', (e) => {
+                                if (e.key === 'Enter' && input.value.trim()) {
+                                    playerName = input.value.trim();
+                                    hasTypedName = true;
+                                    goTo('warning');
+                                }
+                            });
+                        }
+                    }, 2000);
+                }
+            },
+            
+            warning: {
+                text: () => `
+                    <p class="story-text">${playerName}.</p>
+                    <p class="story-text" style="animation-delay: 1.5s">That's ${isLateNight ? 'a brave name for someone reading this so late' : 'a nice name'}.</p>
+                    <p class="story-text" style="animation-delay: 3s">${isWitchingHour ? 'You know what time it is, don\'t you? The hour when the veil is thinnest.' : 'I should warn you about something.'}</p>
+                    <p class="story-text" style="animation-delay: 4.5s">The story you're about to read isn't really a story. It's a <span class="redacted" onclick="this.style.background='transparent';this.style.color='#ff6666'">record</span>.</p>
+                    <div class="choice-container" style="animation-delay: 6s; opacity: 0; animation: fadeIn 2s 6s forwards;">
+                        <button class="choice" onclick="goTo('beginning')">Continue</button>
+                        <button class="choice" onclick="tryToLeave()">Close this page</button>
+                    </div>
+                `
+            },
+            
+            beginning: {
+                text: () => `
+                    <p class="story-text">Three weeks ago, ${victimsName} moved to ${townName}.</p>
+                    <p class="story-text" style="animation-delay: 2s">The house was old—Victorian, the realtor said—but the price was impossible to refuse. ${victimsName} didn't ask why.</p>
+                    <p class="story-text" style="animation-delay: 4s">${playerName}, if you were ${victimsName}, would you have asked?</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 5.5s forwards;">
+                        <button class="choice" onclick="goTo('asked')">Yes, I would have asked about the history</button>
+                        <button class="choice" onclick="goTo('didntask')">No, a good deal is a good deal</button>
+                    </div>
+                `
+            },
+            
+            asked: {
+                text: () => `
+                    <p class="story-text">Careful, aren't you? ${playerName} would have asked.</p>
+                    <p class="story-text" style="animation-delay: 2s">${victimsName} didn't. Perhaps that's why things went the way they did.</p>
+                    <p class="story-text" style="animation-delay: 4s">The first week was quiet. Normal. ${victimsName} unpacked boxes, arranged furniture, hung pictures. The usual rituals of making a house a home.</p>
+                    <p class="story-text" style="animation-delay: 6s">Then, on the eighth night, ${victimsName} woke at 3:17 AM to the sound of breathing.</p>
+                    <p class="story-text" style="animation-delay: 8s">Not their own.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 9.5s forwards;">
+                        <button class="choice" onclick="goTo('investigate')">Investigate the sound</button>
+                        <button class="choice" onclick="goTo('pretend')">Pretend to be asleep</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness++; }
+            },
+            
+            didntask: {
+                text: () => `
+                    <p class="story-text">Pragmatic. I understand, ${playerName}.</p>
+                    <p class="story-text" style="animation-delay: 2s">${victimsName} thought the same way. A good deal is a good deal.</p>
+                    <p class="story-text" style="animation-delay: 4s">The house had been on the market for four years. Four families had bought it. None stayed longer than three months.</p>
+                    <p class="story-text" style="animation-delay: 6s">The realtor didn't mention that. Why would she?</p>
+                    <p class="story-text" style="animation-delay: 8s">On the eighth night, ${victimsName} woke to find all the pictures they'd hung were facing the wall.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 9.5s forwards;">
+                        <button class="choice" onclick="goTo('check_pictures')">Turn the pictures back around</button>
+                        <button class="choice" onclick="goTo('leave_pictures')">Leave them. Leave the house.</button>
+                    </div>
+                `
+            },
+            
+            investigate: {
+                text: () => `
+                    <p class="story-text">${victimsName} got out of bed.</p>
+                    <p class="story-text" style="animation-delay: 2s">The breathing seemed to come from everywhere and nowhere. The walls. The floor. The space between.</p>
+                    <p class="story-text" style="animation-delay: 4s">${victimsName} walked down the hallway, phone flashlight cutting through the dark. Each door was closed, exactly as they'd left them.</p>
+                    <p class="story-text" style="animation-delay: 6s">Except the basement door.</p>
+                    <p class="story-text" style="animation-delay: 8s">It was open exactly two inches. Just enough to see that the darkness down there was somehow <em>darker</em> than it should be.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 9.5s forwards;">
+                        <button class="choice" onclick="goTo('basement')">Go down to the basement</button>
+                        <button class="choice" onclick="goTo('close_door')">Close the door and lock it</button>
+                    </div>
+                `,
+                setup: () => { triggerStatic(); }
+            },
+            
+            pretend: {
+                text: () => `
+                    <p class="story-text">${victimsName} did what you would do, ${playerName}. Stayed still. Controlled their breathing. Pretended.</p>
+                    <p class="story-text" style="animation-delay: 3s">The breathing continued for seventeen minutes. ${victimsName} counted.</p>
+                    <p class="story-text" style="animation-delay: 5s">Then it stopped.</p>
+                    <p class="story-text" style="animation-delay: 7s">And something whispered, right next to ${victimsName}'s ear:</p>
+                    <p class="story-text" style="animation-delay: 9s; color: #666;"><em>"I know you're awake."</em></p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 11s forwards;">
+                        <button class="choice" onclick="goTo('scream')">Scream</button>
+                        <button class="choice" onclick="goTo('stay_still')">Don't move. Don't breathe.</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness += 2; showEye(); }
+            },
+            
+            check_pictures: {
+                text: () => `
+                    <p class="story-text">${victimsName} turned on every light in the house. Logical. Safe.</p>
+                    <p class="story-text" style="animation-delay: 2s">They approached the first picture—a landscape they'd bought at a thrift store.</p>
+                    <p class="story-text" style="animation-delay: 4s">When they turned it around, the painting had changed.</p>
+                    <p class="story-text" style="animation-delay: 6s">It was still a landscape. The same trees, the same sky. But now there was a figure standing at the edge of the forest. Small. Distant.</p>
+                    <p class="story-text" style="animation-delay: 8s">Watching.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 9.5s forwards;">
+                        <button class="choice" onclick="goTo('check_more')">Check the other pictures</button>
+                        <button class="choice" onclick="goTo('burn_picture')">Destroy the painting</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness++; }
+            },
+            
+            leave_pictures: {
+                text: () => `
+                    <p class="story-text">Smart, ${playerName}. Sometimes the right choice is to run.</p>
+                    <p class="story-text" style="animation-delay: 2s">${victimsName} grabbed their keys and phone. Nothing else. Possessions can be replaced.</p>
+                    <p class="story-text" style="animation-delay: 4s">They made it to the front door.</p>
+                    <p class="story-text" style="animation-delay: 6s">It was locked. Not unusual—they'd locked it themselves before bed. But the deadbolt was on the <em>outside</em>.</p>
+                    <p class="story-text" style="animation-delay: 8s">That's not how deadbolts work.</p>
+                    <p class="story-text" style="animation-delay: 10s">That's not how <em>anything</em> in this house works anymore.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 11.5s forwards;">
+                        <button class="choice" onclick="goTo('window')">Try the windows</button>
+                        <button class="choice" onclick="goTo('phone')">Call for help</button>
+                    </div>
+                `,
+                setup: () => { triggerStatic(); watcherAwareness++; }
+            },
+            
+            basement: {
+                text: () => `
+                    <p class="story-text">${victimsName} descended.</p>
+                    <p class="story-text" style="animation-delay: 2s">The stairs creaked in a pattern that almost sounded like words. ${victimsName} tried not to listen.</p>
+                    <p class="story-text" style="animation-delay: 4s">The basement was empty. Concrete floor, exposed pipes, nothing else.</p>
+                    <p class="story-text" style="animation-delay: 6s">Except for the corner. Where the darkness pooled like liquid. Where the phone's flashlight simply... stopped working.</p>
+                    <p class="story-text" style="animation-delay: 8s">And in that darkness, ${playerName}, something smiled.</p>
+                    <p class="story-text" style="animation-delay: 10s">${victimsName} couldn't see the smile, but they <em>felt</em> it. The way you feel someone watching you. The way you feel right now.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 12s forwards;">
+                        <button class="choice" onclick="goTo('ending_basement')">Run</button>
+                        <button class="choice" onclick="goTo('ending_basement')">Stay</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness += 3; showEye(); triggerStatic(); }
+            },
+            
+            close_door: {
+                text: () => `
+                    <p class="story-text">${victimsName} slammed the door shut. Locked it. Pushed a chair under the handle.</p>
+                    <p class="story-text" style="animation-delay: 2s">The breathing stopped.</p>
+                    <p class="story-text" style="animation-delay: 4s">For three days, nothing happened. ${victimsName} started to believe it was a dream, a half-sleep hallucination, the old house settling.</p>
+                    <p class="story-text" style="animation-delay: 6s">On the fourth day, ${victimsName} noticed something while making coffee.</p>
+                    <p class="story-text" style="animation-delay: 8s">The chair was still under the basement door handle.</p>
+                    <p class="story-text" style="animation-delay: 10s">But the door was open again. Just two inches. Just enough.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 11.5s forwards;">
+                        <button class="choice" onclick="goTo('call_priest')">Call someone. Anyone.</button>
+                        <button class="choice" onclick="goTo('accept')">Accept that the house has rules</button>
+                    </div>
+                `
+            },
+            
+            stay_still: {
+                text: () => `
+                    <p class="story-text">${victimsName} didn't move. Didn't breathe. Became stone.</p>
+                    <p class="story-text" style="animation-delay: 3s">The whisper came again: <em>"You're very good at this, ${victimsName}. Better than the others."</em></p>
+                    <p class="story-text" style="animation-delay: 6s">Others?</p>
+                    <p class="story-text" style="animation-delay: 8s"><em>"${getRandomName()} lasted six weeks. ${getRandomName()} only managed four days. But you... you might understand."</em></p>
+                    <p class="story-text" style="animation-delay: 11s">The presence withdrew. Or seemed to. ${victimsName} didn't sleep the rest of the night.</p>
+                    <p class="story-text" style="animation-delay: 13s">In the morning, they found a note on the kitchen table in handwriting that wasn't theirs:</p>
+                    <p class="story-text" style="animation-delay: 15s; font-style: italic; color: #666;">"We're going to be such good friends."</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 17s forwards;">
+                        <button class="choice" onclick="goTo('ending_friend')">Continue reading</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness += 3; showEye(); }
+            },
+            
+            scream: {
+                text: () => `
+                    <p class="story-text">${victimsName} screamed. The sound tore through the house, through the night.</p>
+                    <p class="story-text" style="animation-delay: 2s">Something screamed back.</p>
+                    <p class="story-text" style="animation-delay: 4s">Not mocking. Not threatening. <em>Answering</em>. As if ${victimsName}'s scream was a question and the house had been waiting years to respond.</p>
+                    <p class="story-text" style="animation-delay: 6s">The lights came on by themselves. Every light in every room. The TV turned on, showing static. The radio crackled to life playing a station that shouldn't exist anymore.</p>
+                    <p class="story-text" style="animation-delay: 9s">And in the sudden brightness, ${victimsName} saw them.</p>
+                    <p class="story-text" style="animation-delay: 11s">Standing in every doorway. Sitting on every piece of furniture. Pressed against every window.</p>
+                    <p class="story-text" style="animation-delay: 13s">People. Dozens of them. All watching. All smiling.</p>
+                    <p class="story-text" style="animation-delay: 15s">All with ${victimsName}'s face.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 17s forwards;">
+                        <button class="choice" onclick="goTo('ending_copies')">...</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness += 5; showEye(); triggerStatic(); }
+            },
+            
+            check_more: {
+                text: () => `
+                    <p class="story-text">${victimsName} turned each picture, one by one.</p>
+                    <p class="story-text" style="animation-delay: 2s">In the family portrait (bought from an estate sale): a figure in the background, watching through a window.</p>
+                    <p class="story-text" style="animation-delay: 4s">In the abstract painting: if you looked at it just right, the shapes formed a face. Looking at you.</p>
+                    <p class="story-text" style="animation-delay: 6s">In the photograph of the beach: footprints leading toward the camera. Toward whoever held it. Toward whoever looks at it now.</p>
+                    <p class="story-text" style="animation-delay: 8s">${playerName}, have you checked the pictures in your room recently?</p>
+                    <p class="story-text" style="animation-delay: 10s">I'm sure they're fine.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 12s forwards;">
+                        <button class="choice" onclick="goTo('ending_pictures')">Continue</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness += 2; showEye(); }
+            },
+            
+            burn_picture: {
+                text: () => `
+                    <p class="story-text">${victimsName} took the painting outside. Doused it in lighter fluid. Lit a match.</p>
+                    <p class="story-text" style="animation-delay: 2s">It wouldn't burn.</p>
+                    <p class="story-text" style="animation-delay: 4s">The flames licked the frame, blackened the edges, but the canvas itself refused. The figure in the painting stood there, untouched, as the fire died around it.</p>
+                    <p class="story-text" style="animation-delay: 7s">And now it was closer. No longer at the edge of the forest. Now it stood in the meadow. Details visible for the first time.</p>
+                    <p class="story-text" style="animation-delay: 9s">It was wearing ${victimsName}'s clothes.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 11s forwards;">
+                        <button class="choice" onclick="goTo('ending_burn')">Continue</button>
+                    </div>
+                `,
+                setup: () => { triggerStatic(); watcherAwareness += 2; }
+            },
+            
+            window: {
+                text: () => `
+                    <p class="story-text">Every window was painted shut. Not recently—the paint was decades old, cracked and yellowed. But ${victimsName} had opened these windows just yesterday.</p>
+                    <p class="story-text" style="animation-delay: 3s">They picked up a chair to break the glass.</p>
+                    <p class="story-text" style="animation-delay: 5s">The glass didn't break. The chair did.</p>
+                    <p class="story-text" style="animation-delay: 7s">${victimsName} looked closer at the window, and noticed something in the reflection. Themselves, yes. The room behind them, yes.</p>
+                    <p class="story-text" style="animation-delay: 9s">And someone standing right behind them who hadn't been there a moment ago.</p>
+                    <p class="story-text" style="animation-delay: 11s">${victimsName} spun around.</p>
+                    <p class="story-text" style="animation-delay: 13s">Nobody there.</p>
+                    <p class="story-text" style="animation-delay: 15s">But in the reflection, the figure smiled.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 17s forwards;">
+                        <button class="choice" onclick="goTo('ending_reflection')">Continue</button>
+                    </div>
+                `,
+                setup: () => { showEye(); triggerStatic(); watcherAwareness += 3; }
+            },
+            
+            phone: {
+                text: () => `
+                    <p class="story-text">${victimsName} dialed 911.</p>
+                    <p class="story-text" style="animation-delay: 2s">"911, what's your emergency?"</p>
+                    <p class="story-text" style="animation-delay: 4s">"I'm trapped in my house. Someone's locked me in. I can hear them."</p>
+                    <p class="story-text" style="animation-delay: 6s">A long pause. Then: "Oh, ${victimsName}. We know. We've always known."</p>
+                    <p class="story-text" style="animation-delay: 8s">"What? How do you know my name?"</p>
+                    <p class="story-text" style="animation-delay: 10s">"Everyone knows your name here. You're in the directory. You've always been in the directory. Ever since the house chose you."</p>
+                    <p class="story-text" style="animation-delay: 12s">The line went dead.</p>
+                    <p class="story-text" style="animation-delay: 14s">${playerName}, do you ever wonder who's really on the other end when you call for help?</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 16s forwards;">
+                        <button class="choice" onclick="goTo('ending_phone')">Continue</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness += 2; }
+            },
+            
+            call_priest: {
+                text: () => `
+                    <p class="story-text">${victimsName} found a church online. The priest came the next day. Father Morrison. Kind eyes. Calm voice.</p>
+                    <p class="story-text" style="animation-delay: 3s">He walked through the house with holy water and prayers. ${victimsName} followed, hopeful for the first time in days.</p>
+                    <p class="story-text" style="animation-delay: 5s">When they reached the basement door, Father Morrison stopped.</p>
+                    <p class="story-text" style="animation-delay: 7s">"This isn't a haunting," he said quietly.</p>
+                    <p class="story-text" style="animation-delay: 9s">"Then what is it?"</p>
+                    <p class="story-text" style="animation-delay: 11s">"A wound. In the world. Something tore through here long ago, and it never healed properly. The things you're seeing aren't ghosts. They're..."</p>
+                    <p class="story-text" style="animation-delay: 14s">He never finished the sentence. He just walked out. Drove away. Never looked back.</p>
+                    <p class="story-text" style="animation-delay: 17s">${victimsName} was alone again. But not really. Never really.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 19s forwards;">
+                        <button class="choice" onclick="goTo('ending_wound')">Continue</button>
+                    </div>
+                `
+            },
+            
+            accept: {
+                text: () => `
+                    <p class="story-text">${victimsName} stopped fighting. Stopped questioning. Started learning.</p>
+                    <p class="story-text" style="animation-delay: 2s">The house had rules. Simple enough once you understood:</p>
+                    <p class="story-text" style="animation-delay: 4s">Never look at the basement door after midnight.</p>
+                    <p class="story-text" style="animation-delay: 6s">Always leave one light on somewhere.</p>
+                    <p class="story-text" style="animation-delay: 8s">If you hear your name called from outside, don't answer.</p>
+                    <p class="story-text" style="animation-delay: 10s">If you hear your name called from inside, answer immediately.</p>
+                    <p class="story-text" style="animation-delay: 12s">${victimsName} lived by these rules. Weeks passed. Months. The house became... comfortable. Like wearing someone else's skin until it fits.</p>
+                    <p class="story-text" style="animation-delay: 15s">One night, ${victimsName} caught their reflection doing something they hadn't done. Smiling, when they weren't smiling.</p>
+                    <p class="story-text" style="animation-delay: 17s">They smiled back. It felt natural.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 19s forwards;">
+                        <button class="choice" onclick="goTo('ending_accept')">Continue</button>
+                    </div>
+                `,
+                setup: () => { watcherAwareness += 4; }
+            },
+            
+            // ENDINGS
+            ending_basement: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">${victimsName} ran. Or tried to. Or thought about running. It doesn't matter.</p>
+                        <p class="story-text" style="animation-delay: 3s">The darkness in the basement wasn't contained by the basement. It was the basement. The house. The ground beneath. The air itself.</p>
+                        <p class="story-text" style="animation-delay: 6s">Some places aren't places. They're <em>mouths</em>.</p>
+                        <p class="story-text" style="animation-delay: 9s">The house in ${townName} is still standing. Still for sale. Still a good deal.</p>
+                        <p class="story-text" style="animation-delay: 12s">${playerName}, if you ever find yourself looking at real estate listings late at night, pay attention to the prices.</p>
+                        <p class="story-text" style="animation-delay: 15s">If something seems too good to be true, it's because something is hungry.</p>
+                        <p class="story-text corruption" style="animation-delay: 18s">RECORD ENDS. SUBJECT STATUS: INCORPORATED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `,
+                setup: () => { showFinalEye(); }
+            },
+            
+            ending_friend: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">The note was the first of many.</p>
+                        <p class="story-text" style="animation-delay: 3s">${victimsName} never saw who wrote them. But they appeared daily. On the bathroom mirror. Inside cereal boxes. Once, written on the inside of their eyelids when they blinked.</p>
+                        <p class="story-text" style="animation-delay: 6s">"Good morning, friend." "Don't forget to eat." "I like watching you sleep."</p>
+                        <p class="story-text" style="animation-delay: 9s">The strange part? ${victimsName} started writing back.</p>
+                        <p class="story-text" style="animation-delay: 12s">The stranger part? The conversation was pleasant. Comforting, even. ${victimsName} had never had a friend like this before.</p>
+                        <p class="story-text" style="animation-delay: 15s">The strangest part, ${playerName}, is that you're reading this note right now.</p>
+                        <p class="story-text" style="animation-delay: 18s;">I hope we can be friends too.</p>
+                        <p class="story-text corruption" style="animation-delay: 21s">RECORD ENDS. SUBJECT STATUS: BEFRIENDED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `,
+                setup: () => { showFinalEye(); addSubtleMessage(); }
+            },
+            
+            ending_copies: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">They were ${victimsName}. All of them. Every version of ${victimsName} that had ever existed, could have existed, would never exist.</p>
+                        <p class="story-text" style="animation-delay: 3s">The house didn't trap people. It <em>multiplied</em> them. Every decision, every choice, every path not taken—it kept a copy.</p>
+                        <p class="story-text" style="animation-delay: 6s">Now they were all here. All together. All one.</p>
+                        <p class="story-text" style="animation-delay: 9s">${victimsName} joined them. Stood in the doorway. Smiled.</p>
+                        <p class="story-text" style="animation-delay: 12s">Waited for the next resident.</p>
+                        <p class="story-text" style="animation-delay: 15s;">${playerName}—do you ever feel like you're not quite yourself? Like there's a version of you that made different choices, that's living a different life, that's watching you from somewhere just out of sight?</p>
+                        <p class="story-text" style="animation-delay: 18s">You're probably right.</p>
+                        <p class="story-text corruption" style="animation-delay: 21s">RECORD ENDS. SUBJECT STATUS: MULTIPLIED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `,
+                setup: () => { showFinalEye(); triggerHeavyStatic(); }
+            },
+            
+            ending_pictures: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">${victimsName} covered every picture. Blankets, sheets, whatever was available.</p>
+                        <p class="story-text" style="animation-delay: 3s">The next morning, the covers were gone. The pictures remained. The figure was closer in all of them.</p>
+                        <p class="story-text" style="animation-delay: 6s">By the third day, the figure filled each frame completely. Just a face, pressed against the canvas from the other side, watching.</p>
+                        <p class="story-text" style="animation-delay: 9s">By the fourth day, ${victimsName} was in the pictures too. Standing next to the figure. Smiling.</p>
+                        <p class="story-text" style="animation-delay: 12s">And something wearing ${victimsName}'s body walked out of the house and drove to work and answered to ${victimsName}'s name and nobody noticed the difference.</p>
+                        <p class="story-text" style="animation-delay: 15s">${playerName}—when was the last time you really <em>looked</em> at the people around you? Looked at their eyes? Made sure they were who they seemed to be?</p>
+                        <p class="story-text" style="animation-delay: 18s">When was the last time someone really looked at you?</p>
+                        <p class="story-text corruption" style="animation-delay: 21s">RECORD ENDS. SUBJECT STATUS: REPLACED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `,
+                setup: () => { showFinalEye(); }
+            },
+            
+            ending_burn: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">${victimsName} threw the painting in the trash. It was back on the wall by morning, undamaged.</p>
+                        <p class="story-text" style="animation-delay: 3s">They drove it to a lake and threw it in. It was back on the wall by evening, dry.</p>
+                        <p class="story-text" style="animation-delay: 6s">They gave it to a stranger on the street. By nightfall, the stranger was at their door, confused, painting in hand, saying they found their address written on the back.</p>
+                        <p class="story-text" style="animation-delay: 9s">The figure in the painting was no longer in the meadow. It was standing at a door. ${victimsName}'s door. Hand raised, about to knock.</p>
+                        <p class="story-text" style="animation-delay: 12s">That night, there was a knock.</p>
+                        <p class="story-text" style="animation-delay: 15s">${victimsName} answered. Of course they did. What else could they do?</p>
+                        <p class="story-text" style="animation-delay: 18s">The police found the house empty. The painting remained, hung in the hallway. Now it showed two figures standing in the meadow. One was the original. One was wearing ${victimsName}'s face.</p>
+                        <p class="story-text corruption" style="animation-delay: 22s">RECORD ENDS. SUBJECT STATUS: COLLECTED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `
+            },
+            
+            ending_reflection: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">${victimsName} stopped looking in mirrors. Covered every reflective surface in the house.</p>
+                        <p class="story-text" style="animation-delay: 3s">But the thing in the reflections found other ways. A puddle of water. The screen of a phone. The darkness in another person's eyes.</p>
+                        <p class="story-text" style="animation-delay: 6s">It was patient. It had been waiting in reflections since before mirrors were invented. What was another few days?</p>
+                        <p class="story-text" style="animation-delay: 9s">One morning, ${victimsName} was brushing their teeth, looking at the wall, when they felt a tap on their shoulder.</p>
+                        <p class="story-text" style="animation-delay: 12s">They turned.</p>
+                        <p class="story-text" style="animation-delay: 14s">They saw themselves. Standing there. Solid. Real. Smiling.</p>
+                        <p class="story-text" style="animation-delay: 17s">"Thanks for keeping me company all these years," their reflection said. "But I'd like to try it from this side for a while."</p>
+                        <p class="story-text" style="animation-delay: 20s">${playerName}—go look in a mirror. I'll wait. Look at your reflection. Watch it closely. Does it blink when you blink? Does it move exactly when you move?</p>
+                        <p class="story-text" style="animation-delay: 24s">Are you sure?</p>
+                        <p class="story-text corruption" style="animation-delay: 27s">RECORD ENDS. SUBJECT STATUS: TRANSPOSED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `,
+                setup: () => { showFinalEye(); triggerHeavyStatic(); }
+            },
+            
+            ending_phone: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">${victimsName}'s phone rang constantly after that. Always the same number: their own.</p>
+                        <p class="story-text" style="animation-delay: 3s">When they answered, they heard themselves talking. Conversations from yesterday. From last week. From years ago.</p>
+                        <p class="story-text" style="animation-delay: 6s">And sometimes, conversations that hadn't happened yet.</p>
+                        <p class="story-text" style="animation-delay: 9s">"Don't go outside tomorrow," they heard themselves say. "Don't answer when they call your name. Don't—"</p>
+                        <p class="story-text" style="animation-delay: 12s">The line always cut out before the warning finished.</p>
+                        <p class="story-text" style="animation-delay: 15s">${victimsName} stopped existing on a Tuesday. Not dead—checked. Not missing—searched. Just... stopped being in the world. Their name erased from records. Their face forgotten by friends. Their room in the house in ${townName} empty, as if no one had ever lived there.</p>
+                        <p class="story-text" style="animation-delay: 19s">But sometimes, ${playerName}, if you call a wrong number late at night, you might hear ${victimsName}'s voice on the other end. Trying to warn you about something. Trying to finish a sentence that never ends.</p>
+                        <p class="story-text corruption" style="animation-delay: 23s">RECORD ENDS. SUBJECT STATUS: ERASED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `
+            },
+            
+            ending_wound: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">A wound in the world. ${victimsName} thought about that a lot.</p>
+                        <p class="story-text" style="animation-delay: 3s">Wounds heal. Or they don't. Or they get infected. Or they become something else—scar tissue, tougher than the original skin, but never quite right.</p>
+                        <p class="story-text" style="animation-delay: 6s">The house was scar tissue. Reality trying to heal around something that should never have happened.</p>
+                        <p class="story-text" style="animation-delay: 9s">${victimsName} became part of the scar. Lives there still. Has learned to exist in the wound, between the world that is and the world that almost was.</p>
+                        <p class="story-text" style="animation-delay: 12s">Sometimes they can see through to our side. Sometimes they wave.</p>
+                        <p class="story-text" style="animation-delay: 15s">${playerName}, have you ever seen something in your peripheral vision that wasn't there when you turned to look? Something waving?</p>
+                        <p class="story-text" style="animation-delay: 18s">That might be ${victimsName}. That might be anyone. The wound is bigger than one house now. It's spreading.</p>
+                        <p class="story-text" style="animation-delay: 21s">Slowly. Patiently. Toward you.</p>
+                        <p class="story-text corruption" style="animation-delay: 24s">RECORD ENDS. SUBJECT STATUS: INTEGRATED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `
+            },
+            
+            ending_accept: {
+                text: () => `
+                    <div class="ending">
+                        <p class="story-text">${victimsName} is still in the house. Has been for years now.</p>
+                        <p class="story-text" style="animation-delay: 3s">Or something is. Something that remembers being ${victimsName}. Something that still uses that name, still does ${victimsName}'s job, still calls ${victimsName}'s family on holidays.</p>
+                        <p class="story-text" style="animation-delay: 6s">The family says ${victimsName} seems happier now. More at peace. More... present. Like they finally found where they belong.</p>
+                        <p class="story-text" style="animation-delay: 9s">The house has rules. ${victimsName} follows them. The house has needs. ${victimsName} meets them.</p>
+                        <p class="story-text" style="animation-delay: 12s">The house needed someone to bring it more guests. ${victimsName} became a realtor.</p>
+                        <p class="story-text" style="animation-delay: 15s">Business is good.</p>
+                        <p class="story-text" style="animation-delay: 18s">${playerName}—if you're ever looking for a new place, there's a beautiful Victorian in ${townName}. Great price. Just came on the market.</p>
+                        <p class="story-text" style="animation-delay: 21s">I could show it to you sometime.</p>
+                        <p class="story-text corruption" style="animation-delay: 24s">RECORD ENDS. SUBJECT STATUS: CONVERTED.</p>
+                        <button class="restart-btn" style="margin-top: 40px;" onclick="restart()">Start Over</button>
+                    </div>
+                `,
+                setup: () => { showFinalEye(); addSubtleMessage("I could show it to you"); }
+            },
+            
+            tried_to_leave: {
+                text: () => `
+                    <p class="story-text" style="color: #440000;">You can't close this page, ${playerName}.</p>
+                    <p class="story-text" style="animation-delay: 2s; color: #440000;">Not yet.</p>
+                    <p class="story-text" style="animation-delay: 4s; color: #440000;">You started reading. That was your choice.</p>
+                    <p class="story-text" style="animation-delay: 6s; color: #440000;">Finishing is ours.</p>
+                    <div class="choice-container" style="opacity: 0; animation: fadeIn 2s 8s forwards;">
+                        <button class="choice" onclick="goTo('beginning')">Continue the story</button>
+                    </div>
+                `,
+                setup: () => { triggerStatic(); watcherAwareness += 2; showEye(); }
+            }
+        };
+        
+        // Functions
+        function goTo(scene) {
+            storyPath.push(scene);
+            const content = document.getElementById('content');
+            const story = stories[scene];
+            
+            content.innerHTML = story.text();
+            
+            if (story.setup) {
+                story.setup();
+            }
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        function tryToLeave() {
+            goTo('tried_to_leave');
+        }
+        
+        function restart() {
+            playerName = '';
+            storyPath = [];
+            watcherAwareness = 0;
+            hideEye();
+            goTo('intro');
+        }
+        
+        function triggerStatic() {
+            const overlay = document.getElementById('static');
+            overlay.classList.add('active');
+            setTimeout(() => overlay.classList.remove('active'), 500);
+        }
+        
+        function triggerHeavyStatic() {
+            const overlay = document.getElementById('static');
+            overlay.classList.add('active');
+            setTimeout(() => overlay.classList.remove('active'), 2000);
+        }
+        
+        function showEye() {
+            const eye = document.getElementById('eye');
+            eye.style.top = Math.random() * 80 + 10 + '%';
+            eye.style.left = Math.random() * 80 + 10 + '%';
+            eye.classList.add('visible');
+            
+            setTimeout(() => {
+                if (watcherAwareness < 10) {
+                    eye.classList.remove('visible');
+                }
+            }, 5000);
+        }
+        
+        function showFinalEye() {
+            const eye = document.getElementById('eye');
+            eye.style.top = '50%';
+            eye.style.left = '50%';
+            eye.style.width = '16px';
+            eye.style.height = '16px';
+            eye.classList.add('visible');
+        }
+        
+        function hideEye() {
+            const eye = document.getElementById('eye');
+            eye.classList.remove('visible');
+            eye.style.width = '8px';
+            eye.style.height = '8px';
+        }
+        
+        function addSubtleMessage(msg = "I can see you") {
+            const message = document.createElement('div');
+            message.className = 'subtle-message';
+            message.textContent = msg;
+            message.style.top = Math.random() * 80 + 10 + '%';
+            message.style.left = Math.random() * 80 + 10 + '%';
+            document.body.appendChild(message);
+        }
+        
+        // Mouse tracking for the eye
+        document.addEventListener('mousemove', (e) => {
+            if (watcherAwareness > 3) {
+                const eye = document.getElementById('eye');
+                // Subtle following behavior
+                const dx = (e.clientX - window.innerWidth / 2) * 0.01;
+                const dy = (e.clientY - window.innerHeight / 2) * 0.01;
+                eye.style.transform = `translate(${dx}px, ${dy}px)`;
+            }
+        });
+        
+        // Late night special effects
+        if (isLateNight) {
+            document.body.style.background = '#050505';
+        }
+        
+        if (isWitchingHour) {
+            // Extra creepy during witching hour
+            setInterval(() => {
+                if (Math.random() < 0.1 && watcherAwareness > 2) {
+                    triggerStatic();
+                }
+            }, 30000);
+        }
+        
+        // Initialize
+        goTo('intro');
+        
+        // Easter egg: Konami code reveals hidden message
+        let konamiIndex = 0;
+        const konamiCode = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65];
+        document.addEventListener('keydown', (e) => {
+            if (e.keyCode === konamiCode[konamiIndex]) {
+                konamiIndex++;
+                if (konamiIndex === konamiCode.length) {
+                    addSubtleMessage("You found me");
+                    konamiIndex = 0;
+                }
+            } else {
+                konamiIndex = 0;
+            }
+        });
+        
+        // Console message for developers who look
+        console.log('%c STOP', 'color: red; font-size: 48px; font-weight: bold;');
+        console.log('%c Looking in the console won\'t help you.', 'color: gray; font-size: 14px;');
+        console.log('%c The Watcher sees through every layer.', 'color: gray; font-size: 14px;');
+    </script>
+</body>
+</html>

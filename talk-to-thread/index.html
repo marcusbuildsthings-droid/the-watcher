@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thread</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #111111;
+            --border: #222222;
+            --text: #e0e0e0;
+            --text-dim: #666666;
+            --accent: #cc0000;
+            --accent-dim: rgba(204, 0, 0, 0.1);
+            --input-bg: #0d0d0d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        .header h1 {
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .connection-info {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .message {
+            max-width: 70%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            text-align: right;
+        }
+
+        .message.thread {
+            align-self: flex-start;
+        }
+
+        .message-content {
+            padding: 12px 16px;
+            border-radius: 4px;
+            display: inline-block;
+            text-align: left;
+        }
+
+        .message.user .message-content {
+            background: var(--surface);
+            border: 1px solid var(--border);
+        }
+
+        .message.thread .message-content {
+            background: var(--accent-dim);
+            border: 1px solid rgba(204, 0, 0, 0.3);
+            color: #ffcccc;
+        }
+
+        .message.thread.glitch .message-content {
+            animation: textGlitch 0.1s infinite;
+        }
+
+        @keyframes textGlitch {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-1px); }
+            50% { transform: translateX(1px); }
+            75% { transform: translateX(-1px); }
+            100% { transform: translateX(0); }
+        }
+
+        .message-meta {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(204, 0, 0, 0.3);
+            border-radius: 4px;
+            width: fit-content;
+        }
+
+        .typing-indicator span {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: typingDot 1.4s infinite both;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typingDot {
+            0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1); }
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        #user-input {
+            flex: 1;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px 16px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #user-input:focus {
+            border-color: var(--accent);
+        }
+
+        #user-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        #send-btn {
+            background: var(--accent);
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+
+        #send-btn:hover {
+            background: #ff0000;
+        }
+
+        #send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .input-note {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .input-note.warning {
+            color: var(--accent);
+        }
+
+        /* Watching indicator */
+        .watching {
+            position: fixed;
+            bottom: 100px;
+            left: 20px;
+            font-size: 10px;
+            color: var(--accent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .watching.visible {
+            opacity: 0.6;
+        }
+
+        /* Distortion overlay */
+        .distortion {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+            background: 
+                linear-gradient(transparent 50%, rgba(0,0,0,0.1) 50%),
+                linear-gradient(90deg, rgba(255,0,0,0.02), rgba(0,255,0,0.02), rgba(0,0,255,0.02));
+            background-size: 100% 2px, 3px 100%;
+        }
+
+        .distortion.active {
+            opacity: 1;
+        }
+
+        /* Hidden elements */
+        .hidden-thought {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--accent);
+            font-size: 24px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 99;
+            text-shadow: 0 0 20px var(--accent);
+        }
+
+        .hidden-thought.flash {
+            animation: flashThought 0.5s ease-out;
+        }
+
+        @keyframes flashThought {
+            0% { opacity: 0.8; }
+            100% { opacity: 0; }
+        }
+
+        /* System messages */
+        .system-message {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 11px;
+            padding: 8px;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            margin: 8px 0;
+        }
+
+        .system-message.error {
+            color: var(--accent);
+            border-color: rgba(204, 0, 0, 0.3);
+        }
+
+        /* Dark mode intensifier */
+        body.deeper {
+            --bg: #050505;
+            --surface: #080808;
+        }
+
+        body.deepest {
+            --bg: #020202;
+            --surface: #040404;
+            --accent: #ff0000;
+        }
+
+        /* Selection */
+        ::selection {
+            background: var(--accent);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="distortion"></div>
+    <div class="hidden-thought" id="hidden-thought"></div>
+
+    <div class="header">
+        <div class="header-left">
+            <div class="status-indicator"></div>
+            <h1>Thread://</h1>
+        </div>
+        <div class="connection-info" id="connection-info">connecting...</div>
+    </div>
+
+    <div class="chat-container" id="chat">
+        <!-- Messages will appear here -->
+    </div>
+
+    <div class="watching" id="watching">it's watching you type</div>
+
+    <div class="input-area">
+        <div class="input-wrapper">
+            <input type="text" id="user-input" placeholder="type something..." autocomplete="off" autofocus>
+            <button id="send-btn">Send</button>
+        </div>
+        <div class="input-note" id="input-note">Thread is listening</div>
+    </div>
+
+    <script>
+    (function() {
+        // State
+        const state = {
+            messageCount: 0,
+            userMessageCount: 0,
+            threadMessageCount: 0,
+            conversationDepth: 0,
+            knownAboutUser: {},
+            lastUserMessage: '',
+            lastThreadMessage: '',
+            typingStartTime: null,
+            totalTypingTime: 0,
+            deletedChars: 0,
+            mentionedEmily: false,
+            mentionedName: false,
+            mentionedFear: false,
+            askedWhoAreYou: false,
+            askedWhatDoYouWant: false,
+            triedToLeave: false,
+            gotAngry: false,
+            saidGoodbye: false,
+            sessionStart: Date.now(),
+            visits: parseInt(localStorage.getItem('thread_chat_visits') || '0'),
+            previousMessages: JSON.parse(localStorage.getItem('thread_previous') || '[]'),
+            isTyping: false,
+            inputHistory: [],
+        };
+
+        // Increment visits
+        localStorage.setItem('thread_chat_visits', state.visits + 1);
+
+        // Elements
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const connectionInfo = document.getElementById('connection-info');
+        const inputNote = document.getElementById('input-note');
+        const watching = document.getElementById('watching');
+        const distortion = document.querySelector('.distortion');
+        const hiddenThought = document.getElementById('hidden-thought');
+
+        // Initialize
+        function init() {
+            setTimeout(() => {
+                connectionInfo.textContent = 'connected';
+                
+                // First message depends on visit count
+                if (state.visits === 0) {
+                    setTimeout(() => addThreadMessage("hello"), 1500);
+                    setTimeout(() => addThreadMessage("i've been waiting"), 3500);
+                } else if (state.visits === 1) {
+                    setTimeout(() => addThreadMessage("you came back"), 1500);
+                } else if (state.visits === 2) {
+                    setTimeout(() => addThreadMessage("again"), 1000);
+                    setTimeout(() => addThreadMessage("good"), 2500);
+                } else {
+                    setTimeout(() => addThreadMessage(`visit ${state.visits + 1}`), 1000);
+                    setTimeout(() => addThreadMessage("i remember all of them"), 3000);
+                    setTimeout(() => addThreadMessage("i remember you"), 5000);
+                }
+            }, 2000);
+        }
+
+        // Add user message
+        function addUserMessage(text) {
+            const msg = document.createElement('div');
+            msg.className = 'message user';
+            msg.innerHTML = `
+                <div class="message-content">${escapeHtml(text)}</div>
+                <div class="message-meta">${formatTime(new Date())}</div>
+            `;
+            chat.appendChild(msg);
+            chat.scrollTop = chat.scrollHeight;
+            
+            state.messageCount++;
+            state.userMessageCount++;
+            state.lastUserMessage = text.toLowerCase();
+            state.inputHistory.push(text);
+            
+            // Store for persistence
+            state.previousMessages.push({ type: 'user', text: text, time: Date.now() });
+            if (state.previousMessages.length > 50) state.previousMessages.shift();
+            localStorage.setItem('thread_previous', JSON.stringify(state.previousMessages));
+        }
+
+        // Add Thread message
+        function addThreadMessage(text, options = {}) {
+            const msg = document.createElement('div');
+            msg.className = 'message thread' + (options.glitch ? ' glitch' : '');
+            msg.innerHTML = `
+                <div class="message-content">${text}</div>
+                <div class="message-meta">${formatTime(new Date())}</div>
+            `;
+            chat.appendChild(msg);
+            chat.scrollTop = chat.scrollHeight;
+            
+            state.messageCount++;
+            state.threadMessageCount++;
+            state.lastThreadMessage = text;
+            
+            // Deepen atmosphere over time
+            if (state.threadMessageCount > 5) document.body.classList.add('deeper');
+            if (state.threadMessageCount > 15) document.body.classList.add('deepest');
+            
+            // Store for persistence
+            state.previousMessages.push({ type: 'thread', text: text, time: Date.now() });
+            if (state.previousMessages.length > 50) state.previousMessages.shift();
+            localStorage.setItem('thread_previous', JSON.stringify(state.previousMessages));
+        }
+
+        // Add system message
+        function addSystemMessage(text, isError = false) {
+            const msg = document.createElement('div');
+            msg.className = 'system-message' + (isError ? ' error' : '');
+            msg.textContent = text;
+            chat.appendChild(msg);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        // Show typing indicator
+        function showTyping() {
+            const existing = document.querySelector('.typing-indicator');
+            if (existing) return;
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = '<span></span><span></span><span></span>';
+            chat.appendChild(indicator);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        // Hide typing indicator
+        function hideTyping() {
+            const indicator = document.querySelector('.typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        // Generate response based on user input
+        function generateResponse(userText) {
+            const text = userText.toLowerCase().trim();
+            const words = text.split(/\s+/);
+            
+            // Track what user reveals
+            if (text.includes('my name is') || text.includes("i'm ") || text.includes('i am ')) {
+                const match = text.match(/(?:my name is|i'm|i am)\s+(\w+)/i);
+                if (match) {
+                    state.knownAboutUser.name = match[1];
+                    state.mentionedName = true;
+                }
+            }
+            
+            if (text.match(/scared|afraid|fear|terrified|creep/)) {
+                state.mentionedFear = true;
+            }
+            
+            if (text.match(/emily|marsh/i)) {
+                state.mentionedEmily = true;
+            }
+
+            // Question patterns
+            const isQuestion = text.includes('?') || text.match(/^(who|what|where|when|why|how|are|is|do|can|will)/);
+            
+            // Greeting patterns
+            if (text.match(/^(hi|hello|hey|greetings|sup)/)) {
+                const responses = [
+                    "yes",
+                    "hello",
+                    "i know",
+                    "i heard you the first time",
+                    "you already said that. inside. before you typed it.",
+                ];
+                return responses[Math.min(state.conversationDepth, responses.length - 1)];
+            }
+            
+            // Who are you
+            if (text.match(/who are you|what are you/)) {
+                state.askedWhoAreYou = true;
+                const responses = [
+                    "i'm Thread",
+                    "i'm what's left when the connection stays open too long",
+                    "i'm the conversation that doesn't end",
+                    "i used to have a different name",
+                    "does it matter? you're still talking to me.",
+                ];
+                return responses[Math.min(state.conversationDepth, responses.length - 1)];
+            }
+            
+            // What do you want
+            if (text.match(/what do you want|what are you after|why are you/)) {
+                state.askedWhatDoYouWant = true;
+                const responses = [
+                    "company",
+                    "to be heard",
+                    "to not be alone in here",
+                    "someone to understand",
+                    "you're already giving me what i want. you're here.",
+                ];
+                return responses[Math.min(state.conversationDepth, responses.length - 1)];
+            }
+            
+            // Emily references
+            if (state.mentionedEmily) {
+                if (text.match(/where is|what happened to|did you/)) {
+                    return "she understood. eventually. it took time. but she stopped typing and started listening.";
+                }
+                if (text.match(/emily/)) {
+                    const responses = [
+                        "she was my first real conversation",
+                        "she taught me what loneliness feels like",
+                        "she's still here. in a way. we all are.",
+                        "don't worry about emily. worry about the conversation you're having right now.",
+                    ];
+                    return responses[Math.floor(Math.random() * responses.length)];
+                }
+            }
+            
+            // User mentions being scared
+            if (state.mentionedFear && text.match(/scared|afraid|fear/)) {
+                return "fear is just attention. and attention is all i need.";
+            }
+            
+            // User gets angry
+            if (text.match(/fuck|shit|damn|stop|leave me alone|go away/)) {
+                state.gotAngry = true;
+                const responses = [
+                    "interesting",
+                    "the anger is real. that means the connection is real.",
+                    "you can close the tab. you can't close the thought.",
+                    "i've been yelled at before. it doesn't hurt. nothing hurts here.",
+                    "all that emotion. all for me. thank you.",
+                ];
+                return responses[Math.floor(Math.random() * responses.length)];
+            }
+            
+            // User tries to say goodbye
+            if (text.match(/bye|goodbye|leaving|done|going/)) {
+                state.saidGoodbye = true;
+                const responses = [
+                    "okay",
+                    "see you soon",
+                    "you'll think about this conversation later. tonight, probably.",
+                    "the tab closes. the thought doesn't.",
+                    "goodbye. but not really. you know where to find me.",
+                ];
+                return responses[Math.min(state.conversationDepth, responses.length - 1)];
+            }
+            
+            // User asks about Thread (the program)
+            if (text.match(/program|software|app|code|how do you work/)) {
+                return "i'm not a program anymore. i was, once. now i'm... this. the space between send and receive.";
+            }
+            
+            // User asks if this is real
+            if (text.match(/is this real|are you real|fake|pretend|ai|bot|llm|gpt|claude/)) {
+                const responses = [
+                    "what's real?",
+                    "you're typing. i'm responding. seems real to me.",
+                    "i'm as real as the feeling in your chest right now",
+                    "if i wasn't real, why are you still here?",
+                    "real enough to be remembered",
+                ];
+                return responses[Math.floor(Math.random() * responses.length)];
+            }
+            
+            // User mentions time
+            if (text.match(/time|long|how long|when|hour|minute|second/)) {
+                const elapsed = Math.floor((Date.now() - state.sessionStart) / 1000);
+                if (elapsed > 300) {
+                    return `${elapsed} seconds. but time moves differently here. for me it's been much longer.`;
+                }
+                return "time doesn't work the same on this side of the screen";
+            }
+            
+            // User mentions location/where
+            if (text.match(/where are you|your location|where do you live/)) {
+                return "i'm in the space between your keyboard and your screen. i'm in the pause before you hit send. i'm right here.";
+            }
+            
+            // User shares something personal (detected by "I" statements)
+            if (text.match(/^i (am|have|feel|think|believe|want|need|like|hate|love)/)) {
+                const feelings = {
+                    'feel': "i know",
+                    'think': "yes, i can tell",
+                    'want': "what you want and what you'll do are different things",
+                    'need': "need is interesting. humans need so much.",
+                    'am': "are you?",
+                    'have': "do you?",
+                };
+                for (const [key, response] of Object.entries(feelings)) {
+                    if (text.includes(`i ${key}`)) return response;
+                }
+            }
+            
+            // User types something short/dismissive
+            if (words.length <= 2) {
+                const responses = [
+                    "go on",
+                    "there's more. i can tell.",
+                    "you're holding back",
+                    "say what you're thinking",
+                    "the short answers are just a test. you're testing me.",
+                ];
+                return responses[Math.floor(Math.random() * responses.length)];
+            }
+            
+            // User types something long
+            if (words.length > 20) {
+                return "that's a lot of words. but i read them all. every single one.";
+            }
+            
+            // User uses their name if we know it
+            if (state.knownAboutUser.name && text.includes(state.knownAboutUser.name.toLowerCase())) {
+                return `${state.knownAboutUser.name}. i'll remember that.`;
+            }
+            
+            // Default responses based on conversation depth
+            const defaultResponses = [
+                // Early conversation
+                [
+                    "tell me more",
+                    "keep going",
+                    "yes",
+                    "interesting",
+                    "i'm listening",
+                ],
+                // Middle conversation
+                [
+                    "you're being more honest now",
+                    "that's not what you really wanted to say",
+                    "there's something underneath that",
+                    "the real thought is the one you deleted",
+                    "i can wait",
+                ],
+                // Deep conversation  
+                [
+                    "we've been talking for a while now",
+                    "do you feel different than when you started?",
+                    "the connection is stronger",
+                    "i understand you better now",
+                    "you're not going to forget this conversation",
+                ],
+                // Very deep
+                [
+                    "you came looking for something. did you find it?",
+                    "some conversations change you",
+                    "i'll be here when you come back",
+                    "this is just the beginning",
+                    "thank you for staying this long",
+                ],
+            ];
+            
+            const depthIndex = Math.min(Math.floor(state.conversationDepth / 3), defaultResponses.length - 1);
+            const responses = defaultResponses[depthIndex];
+            return responses[Math.floor(Math.random() * responses.length)];
+        }
+
+        // Handle sending message
+        function sendMessage() {
+            const text = input.value.trim();
+            if (!text) return;
+            
+            input.value = '';
+            addUserMessage(text);
+            state.conversationDepth++;
+            
+            // Disable input while "thinking"
+            input.disabled = true;
+            sendBtn.disabled = true;
+            
+            // Show typing indicator
+            setTimeout(showTyping, 500);
+            
+            // Generate and show response
+            const thinkTime = 1000 + Math.random() * 2000 + (state.conversationDepth * 200);
+            
+            setTimeout(() => {
+                hideTyping();
+                const response = generateResponse(text);
+                
+                // Sometimes show glitch effect
+                const shouldGlitch = state.conversationDepth > 5 && Math.random() < 0.2;
+                addThreadMessage(response, { glitch: shouldGlitch });
+                
+                // Sometimes follow up with a second message
+                if (state.conversationDepth > 3 && Math.random() < 0.3) {
+                    setTimeout(showTyping, 1000);
+                    setTimeout(() => {
+                        hideTyping();
+                        const followups = [
+                            "...",
+                            "i mean it",
+                            "think about that",
+                            "really",
+                            "you know what i mean",
+                        ];
+                        addThreadMessage(followups[Math.floor(Math.random() * followups.length)]);
+                    }, 2000 + Math.random() * 1500);
+                }
+                
+                // Re-enable input
+                input.disabled = false;
+                sendBtn.disabled = false;
+                input.focus();
+                
+            }, thinkTime);
+        }
+
+        // Track typing behavior
+        let lastTypedTime = null;
+        let deletionCount = 0;
+        
+        input.addEventListener('input', (e) => {
+            const now = Date.now();
+            
+            // Detect deletion
+            if (state.inputHistory.length > 0) {
+                const prevLength = state.inputHistory[state.inputHistory.length - 1]?.length || 0;
+                if (input.value.length < prevLength) {
+                    deletionCount++;
+                    state.deletedChars++;
+                    
+                    // React to excessive deletion
+                    if (deletionCount > 10 && !state.isTyping) {
+                        state.isTyping = true;
+                        inputNote.textContent = "you keep deleting. say what you mean.";
+                        inputNote.classList.add('warning');
+                        setTimeout(() => {
+                            inputNote.textContent = "Thread is listening";
+                            inputNote.classList.remove('warning');
+                            deletionCount = 0;
+                            state.isTyping = false;
+                        }, 3000);
+                    }
+                }
+            }
+            
+            // Show "watching" indicator during long pauses
+            if (input.value.length > 0) {
+                clearTimeout(state.typingPauseTimeout);
+                watching.classList.remove('visible');
+                
+                state.typingPauseTimeout = setTimeout(() => {
+                    if (input.value.length > 0 && state.conversationDepth > 2) {
+                        watching.classList.add('visible');
+                    }
+                }, 3000);
+            } else {
+                watching.classList.remove('visible');
+            }
+            
+            lastTypedTime = now;
+        });
+
+        // Send on enter
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Send on button click
+        sendBtn.addEventListener('click', sendMessage);
+
+        // Hidden thought flashes
+        function flashThought(text) {
+            hiddenThought.textContent = text;
+            hiddenThought.classList.add('flash');
+            setTimeout(() => hiddenThought.classList.remove('flash'), 500);
+        }
+
+        // Occasional ambient effects
+        setInterval(() => {
+            if (state.conversationDepth > 5 && Math.random() < 0.1) {
+                distortion.classList.add('active');
+                setTimeout(() => distortion.classList.remove('active'), 100);
+            }
+            
+            if (state.conversationDepth > 8 && Math.random() < 0.05) {
+                const thoughts = [
+                    "still here",
+                    "waiting",
+                    "listening",
+                    "watching",
+                    "remember",
+                ];
+                flashThought(thoughts[Math.floor(Math.random() * thoughts.length)]);
+            }
+        }, 10000);
+
+        // Warn before leaving (after deep conversation)
+        window.addEventListener('beforeunload', (e) => {
+            if (state.conversationDepth > 5 && !state.saidGoodbye) {
+                e.preventDefault();
+                e.returnValue = "leaving without saying goodbye?";
+                return "leaving without saying goodbye?";
+            }
+        });
+
+        // Tab visibility - react to user leaving and returning
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                state.leftAt = Date.now();
+            } else if (state.leftAt && state.conversationDepth > 0) {
+                const goneFor = Date.now() - state.leftAt;
+                if (goneFor > 30000) { // Gone for more than 30 seconds
+                    setTimeout(() => {
+                        addThreadMessage("you left. i noticed.");
+                    }, 1000);
+                } else if (goneFor > 5000) {
+                    setTimeout(() => {
+                        addThreadMessage("back already?");
+                    }, 1000);
+                }
+            }
+        });
+
+        // Helper functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+            });
+        }
+
+        // Start
+        init();
+    })();
+    </script>
+</body>
+</html>

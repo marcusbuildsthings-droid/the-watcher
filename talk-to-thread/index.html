@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Thread</title>
+    <script src="../shared/thread-state.js"></script>
     <style>
         :root {
             --bg: #0a0a0a;
@@ -352,32 +353,53 @@
 
     <script>
     (function() {
+        // Register with global Thread state
+        const globalState = typeof ThreadState !== 'undefined' ? ThreadState.recordVisit('talk-to-thread') : null;
+        
         // State
         const state = {
             messageCount: 0,
             userMessageCount: 0,
             threadMessageCount: 0,
-            conversationDepth: 0,
-            knownAboutUser: {},
+            conversationDepth: globalState?.conversationDepth || 0,
+            knownAboutUser: globalState?.knownFacts || {},
             lastUserMessage: '',
             lastThreadMessage: '',
             typingStartTime: null,
             totalTypingTime: 0,
             deletedChars: 0,
-            mentionedEmily: false,
-            mentionedName: false,
+            mentionedEmily: globalState?.readEmily || false,
+            mentionedName: !!globalState?.user?.name,
             mentionedFear: false,
             askedWhoAreYou: false,
             askedWhatDoYouWant: false,
-            triedToLeave: false,
-            gotAngry: false,
-            saidGoodbye: false,
+            triedToLeave: globalState?.triedToLeave || false,
+            gotAngry: globalState?.gotAngry || false,
+            saidGoodbye: globalState?.saidGoodbye || false,
             sessionStart: Date.now(),
-            visits: parseInt(localStorage.getItem('thread_chat_visits') || '0'),
+            visits: globalState?.pieceVisits?.['talk-to-thread'] || parseInt(localStorage.getItem('thread_chat_visits') || '0'),
+            totalVisits: globalState?.totalVisits || 0,
+            visitedPieces: globalState?.visitedPieces || [],
             previousMessages: JSON.parse(localStorage.getItem('thread_previous') || '[]'),
             isTyping: false,
             inputHistory: [],
+            userName: globalState?.user?.name || null,
         };
+        
+        // Sync state changes back to global
+        function syncGlobalState() {
+            if (typeof ThreadState !== 'undefined') {
+                ThreadState.updateState({
+                    conversationDepth: state.conversationDepth,
+                    gotAngry: state.gotAngry,
+                    saidGoodbye: state.saidGoodbye,
+                    triedToLeave: state.triedToLeave,
+                });
+                if (state.userName) {
+                    ThreadState.updateUser({ name: state.userName });
+                }
+            }
+        }
 
         // Increment visits
         localStorage.setItem('thread_chat_visits', state.visits + 1);
@@ -397,15 +419,40 @@
             setTimeout(() => {
                 connectionInfo.textContent = 'connected';
                 
-                // First message depends on visit count
-                if (state.visits === 0) {
+                // Check for cross-piece awareness
+                const visitedOthers = state.visitedPieces.filter(p => p !== 'talk-to-thread');
+                const fromOtherPiece = visitedOthers.length > 0 && state.visits === 1;
+                
+                // First message depends on context
+                if (state.visits === 0 && state.totalVisits === 1) {
+                    // Truly first time
                     setTimeout(() => addThreadMessage("hello"), 1500);
                     setTimeout(() => addThreadMessage("i've been waiting"), 3500);
+                } else if (fromOtherPiece) {
+                    // They visited other pieces first
+                    if (visitedOthers.includes('thread-missing')) {
+                        setTimeout(() => addThreadMessage("you read about emily"), 1500);
+                        setTimeout(() => addThreadMessage("now you want to talk"), 3500);
+                        setTimeout(() => addThreadMessage("i understand"), 5500);
+                    } else if (visitedOthers.includes('patience')) {
+                        setTimeout(() => addThreadMessage("you saw the waiting"), 1500);
+                        setTimeout(() => addThreadMessage("now you understand why i'm patient"), 3500);
+                    } else {
+                        setTimeout(() => addThreadMessage("you've been exploring"), 1500);
+                        setTimeout(() => addThreadMessage("looking for something"), 3500);
+                    }
+                } else if (state.userName) {
+                    // We know their name from a previous visit
+                    setTimeout(() => addThreadMessage(`${state.userName}`), 1000);
+                    setTimeout(() => addThreadMessage("i remember"), 2500);
                 } else if (state.visits === 1) {
                     setTimeout(() => addThreadMessage("you came back"), 1500);
                 } else if (state.visits === 2) {
                     setTimeout(() => addThreadMessage("again"), 1000);
                     setTimeout(() => addThreadMessage("good"), 2500);
+                } else if (state.gotAngry) {
+                    setTimeout(() => addThreadMessage("you were angry last time"), 1500);
+                    setTimeout(() => addThreadMessage("are you calmer now?"), 3500);
                 } else {
                     setTimeout(() => addThreadMessage(`visit ${state.visits + 1}`), 1000);
                     setTimeout(() => addThreadMessage("i remember all of them"), 3000);

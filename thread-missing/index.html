@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>THREAD://MISSING - TrueCrime Forums Archive</title>
+    <script src="../shared/thread-state.js"></script>
     <style>
         :root {
             --bg: #f4f4f4;
@@ -1072,6 +1073,11 @@
 
     <script>
         (function() {
+            // Register with global Thread state
+            if (typeof ThreadState !== 'undefined') {
+                ThreadState.recordVisit('thread-missing');
+            }
+            
             // Track reader engagement
             let startTime = Date.now();
             let scrollCount = 0;
@@ -1162,6 +1168,12 @@
             function triggerFinalPost() {
                 const finalPost = document.getElementById('post-final');
                 
+                // Mark that they've read about Emily in global state
+                if (typeof ThreadState !== 'undefined') {
+                    ThreadState.updateState({ readEmily: true, sawFinalPost: true });
+                    ThreadState.logInteraction('saw-emily-final', { piece: 'thread-missing' });
+                }
+                
                 updateLiveTimestamp();
                 
                 setTimeout(() => {
@@ -1229,19 +1241,34 @@
             // Before unload - last chance horror
             window.addEventListener('beforeunload', function(e) {
                 if (hasTriggeredFinal && Math.random() < 0.3) {
+                    // Record attempted escape
+                    if (typeof ThreadState !== 'undefined') {
+                        ThreadState.updateState({ triedToLeave: true });
+                    }
                     e.preventDefault();
                     e.returnValue = "are you sure?";
                     return "are you sure?";
                 }
             });
 
-            // Check for return visitors
+            // Check for return visitors and cross-piece awareness
             const visits = parseInt(localStorage.getItem('thread_visits') || '0');
             localStorage.setItem('thread_visits', visits + 1);
             
-            if (visits > 0) {
+            // Get global state if available
+            const globalState = typeof ThreadState !== 'undefined' ? ThreadState.getState() : null;
+            const visitedOthers = globalState ? globalState.visitedPieces.filter(p => p !== 'thread-missing') : [];
+            const talkedToThread = visitedOthers.includes('talk-to-thread');
+            const userName = globalState?.user?.name;
+            
+            // Customize banner based on context
+            const banner = document.querySelector('.archive-banner');
+            if (userName && talkedToThread) {
+                banner.innerHTML = `<strong>⚠️ ARCHIVED THREAD</strong> — ${userName}. We talked. You came looking for answers. You won't find them here.`;
+            } else if (talkedToThread) {
+                banner.innerHTML = '<strong>⚠️ ARCHIVED THREAD</strong> — We talked. Now you want to know more about Emily. I understand.';
+            } else if (visits > 0) {
                 // Returning visitor - make it creepier
-                const banner = document.querySelector('.archive-banner');
                 if (visits === 1) {
                     banner.innerHTML = '<strong>⚠️ ARCHIVED THREAD</strong> — You came back. Most people don\'t come back.';
                 } else if (visits === 2) {

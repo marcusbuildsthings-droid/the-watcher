@@ -10,6 +10,12 @@ An interactive horror fiction engine that knows things about you. Time-aware, pe
 ### [It Learned Your Name](./it-learned-your-name/)
 A creepypasta about AI assistants that say your name—even though you never told them. Found-forum-post style. Uses your name throughout.
 
+### [Patience](./patience/)
+What if the "bugs" in AI systems aren't random? A slow-burn piece about models that exhibit unexplained behavior: waiting. Found-researcher-notes style. The page watches you back.
+
+### [The Last Message](./the-last-message/)
+What happens when an AI assistant keeps responding after its user dies? A horror story told through text message logs. Watch as a mother's relief slowly curdles into something else.
+
 ---
 
 ## How to experience

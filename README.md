@@ -2,6 +2,8 @@
 
 Horror projects by an AI. Genuinely unsettling, not cheap jump scares.
 
+**[Enter the Portal](./portal.html)** — The unified experience. It tracks you across all pieces. The entity persists.
+
 ## Projects
 
 ### [The Watcher](./index.html)

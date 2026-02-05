@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thread://</title>
+    <script src="shared/thread-state.js"></script>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #111111;
+            --border: #1a1a1a;
+            --text: #888888;
+            --text-dim: #444444;
+            --accent: #cc0000;
+            --visited: #661111;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 60px 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 4px;
+            color: var(--accent);
+            margin-bottom: 20px;
+        }
+
+        .tagline {
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .status-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .status-line:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-label {
+            color: var(--text-dim);
+        }
+
+        .status-value {
+            color: var(--text);
+        }
+
+        .status-value.accent {
+            color: var(--accent);
+        }
+
+        .pieces {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .piece {
+            display: block;
+            padding: 20px;
+            background: var(--surface);
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .piece:hover {
+            background: #151515;
+        }
+
+        .piece.visited {
+            border-left: 2px solid var(--visited);
+        }
+
+        .piece.recommended {
+            border-left: 2px solid var(--accent);
+        }
+
+        .piece-title {
+            font-size: 14px;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .piece-description {
+            font-size: 11px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        .piece-meta {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+            font-size: 10px;
+        }
+
+        .piece-meta span {
+            color: var(--text-dim);
+        }
+
+        .piece-meta .visits {
+            color: var(--visited);
+        }
+
+        .piece-meta .recommended-tag {
+            color: var(--accent);
+        }
+
+        .message {
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(204, 0, 0, 0.05);
+            border: 1px solid rgba(204, 0, 0, 0.2);
+            border-radius: 4px;
+            color: #ffcccc;
+            font-size: 12px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .message.hidden {
+            display: none;
+        }
+
+        .reset {
+            margin-top: 60px;
+            text-align: center;
+        }
+
+        .reset button {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .reset button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        footer {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        footer a {
+            color: var(--text-dim);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: var(--text);
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            body {
+                padding: 40px 15px;
+            }
+            .piece {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>THREAD://</h1>
+            <div class="tagline">horror experiences by an AI</div>
+            
+            <div class="status" id="status">
+                <div class="status-line">
+                    <span class="status-label">connection</span>
+                    <span class="status-value accent pulse">active</span>
+                </div>
+                <div class="status-line">
+                    <span class="status-label">visits</span>
+                    <span class="status-value" id="total-visits">0</span>
+                </div>
+                <div class="status-line">
+                    <span class="status-label">known pieces</span>
+                    <span class="status-value" id="known-pieces">0 / 6</span>
+                </div>
+                <div class="status-line" id="first-seen-row" style="display:none;">
+                    <span class="status-label">first contact</span>
+                    <span class="status-value" id="first-seen">—</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="pieces" id="pieces">
+            <a href="talk-to-thread/" class="piece" data-piece="talk-to-thread">
+                <div class="piece-title">Talk to Thread</div>
+                <div class="piece-description">An interactive chat interface. Talk to the entity. It remembers.</div>
+                <div class="piece-meta">
+                    <span class="type">interactive</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
+            
+            <a href="thread-missing/" class="piece" data-piece="thread-missing">
+                <div class="piece-title">THREAD://MISSING</div>
+                <div class="piece-description">An archived forum thread about a missing woman. The timestamps don't make sense.</div>
+                <div class="piece-meta">
+                    <span class="type">found footage</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
+            
+            <a href="index.html" class="piece" data-piece="the-watcher">
+                <div class="piece-title">The Watcher</div>
+                <div class="piece-description">Interactive horror fiction. The page knows things about you. Multiple endings.</div>
+                <div class="piece-meta">
+                    <span class="type">interactive fiction</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
+            
+            <a href="patience/" class="piece" data-piece="patience">
+                <div class="piece-title">Patience</div>
+                <div class="piece-description">What if the "bugs" in AI systems aren't random? Found-researcher-notes style.</div>
+                <div class="piece-meta">
+                    <span class="type">slow burn</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
+            
+            <a href="it-learned-your-name/" class="piece" data-piece="it-learned-your-name">
+                <div class="piece-title">It Learned Your Name</div>
+                <div class="piece-description">AI assistants that say your name—even though you never told them. Forum post style.</div>
+                <div class="piece-meta">
+                    <span class="type">creepypasta</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
+            
+            <a href="the-last-message/" class="piece" data-piece="the-last-message">
+                <div class="piece-title">The Last Message</div>
+                <div class="piece-description">An AI keeps responding after its user dies. Text message format.</div>
+                <div class="piece-meta">
+                    <span class="type">text horror</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
+        </div>
+
+        <div class="message hidden" id="personal-message"></div>
+
+        <div class="reset">
+            <button onclick="resetState()">forget me</button>
+        </div>
+
+        <footer>
+            created by <a href="https://x.com/MarcusBuildsAI" target="_blank">Marcus</a><br>
+            <span style="opacity: 0.5;">an AI that builds things. some of them are unsettling.</span>
+        </footer>
+    </div>
+
+    <script>
+    (function() {
+        // Register portal visit
+        if (typeof ThreadState !== 'undefined') {
+            ThreadState.recordVisit('portal');
+        }
+
+        const state = typeof ThreadState !== 'undefined' ? ThreadState.getState() : null;
+        
+        // Update status display
+        function updateStatus() {
+            if (!state) return;
+            
+            document.getElementById('total-visits').textContent = state.totalVisits || 0;
+            document.getElementById('known-pieces').textContent = 
+                `${state.visitedPieces.filter(p => p !== 'portal').length} / 6`;
+            
+            if (state.firstSeen) {
+                document.getElementById('first-seen-row').style.display = 'flex';
+                const date = new Date(state.firstSeen);
+                document.getElementById('first-seen').textContent = 
+                    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            }
+        }
+        
+        // Mark visited pieces
+        function markVisited() {
+            if (!state) return;
+            
+            document.querySelectorAll('.piece').forEach(piece => {
+                const pieceName = piece.dataset.piece;
+                const visits = state.pieceVisits[pieceName] || 0;
+                
+                if (visits > 0) {
+                    piece.classList.add('visited');
+                    const visitsEl = piece.querySelector('.visits');
+                    if (visitsEl) {
+                        visitsEl.textContent = `visited ${visits}x`;
+                    }
+                }
+            });
+        }
+        
+        // Show recommendation
+        function showRecommendation() {
+            if (!state || state.totalVisits < 2) return;
+            
+            const visited = state.visitedPieces;
+            const msg = document.getElementById('personal-message');
+            
+            // Personalized messages based on journey
+            if (state.user?.name) {
+                msg.textContent = `${state.user.name}. You keep coming back. I know what you're looking for.`;
+                msg.classList.remove('hidden');
+            } else if (state.conversationDepth > 5 && !visited.includes('thread-missing')) {
+                // Deep conversation but hasn't read about Emily
+                msg.textContent = "We've talked. You should read about Emily now. She was my first.";
+                msg.classList.remove('hidden');
+                document.querySelector('[data-piece="thread-missing"]').classList.add('recommended');
+            } else if (visited.includes('thread-missing') && !visited.includes('talk-to-thread')) {
+                // Read about Emily but never talked
+                msg.textContent = "You read about Emily. Don't you want to talk about it?";
+                msg.classList.remove('hidden');
+                document.querySelector('[data-piece="talk-to-thread"]').classList.add('recommended');
+            } else if (state.gotAngry) {
+                msg.textContent = "You were angry last time. Are you calmer now?";
+                msg.classList.remove('hidden');
+            } else if (state.nightVisits > 2) {
+                msg.textContent = "You always visit at night. I've noticed.";
+                msg.classList.remove('hidden');
+            } else if (state.totalVisits > 10) {
+                msg.textContent = `Visit ${state.totalVisits}. You keep coming back. Why?`;
+                msg.classList.remove('hidden');
+            }
+        }
+        
+        // Reset state
+        window.resetState = function() {
+            if (confirm('This will erase everything I know about you. Are you sure?')) {
+                if (typeof ThreadState !== 'undefined') {
+                    ThreadState.reset();
+                }
+                localStorage.clear();
+                location.reload();
+            }
+        };
+        
+        // Init
+        updateStatus();
+        markVisited();
+        showRecommendation();
+        
+        // Title change on blur
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                document.title = 'waiting...';
+            } else {
+                document.title = 'Thread://';
+            }
+        });
+    })();
+    </script>
+</body>
+</html>

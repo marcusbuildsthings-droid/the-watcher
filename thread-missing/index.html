@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THREAD://MISSING - TrueCrime Forums Archive</title>
+    <style>
+        :root {
+            --bg: #f4f4f4;
+            --forum-bg: #ffffff;
+            --border: #c8c8c8;
+            --text: #333333;
+            --link: #0066cc;
+            --visited: #551a8b;
+            --meta: #666666;
+            --quote-bg: #eeeeee;
+            --warning: #990000;
+            --glitch: #ff0000;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Verdana, Geneva, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .archive-banner {
+            background: #ffffcc;
+            border-bottom: 1px solid #cccc00;
+            padding: 8px 15px;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .archive-banner strong {
+            color: var(--warning);
+        }
+
+        .forum-header {
+            background: linear-gradient(to bottom, #4a6ea5, #2d4a7c);
+            color: white;
+            padding: 10px 15px;
+            border-bottom: 2px solid #1a3055;
+        }
+
+        .forum-header h1 {
+            font-size: 18px;
+            font-weight: normal;
+            letter-spacing: 1px;
+        }
+
+        .forum-nav {
+            background: #e8e8e8;
+            border-bottom: 1px solid var(--border);
+            padding: 5px 15px;
+            font-size: 10px;
+        }
+
+        .forum-nav a {
+            color: var(--link);
+            text-decoration: none;
+        }
+
+        .forum-nav a:hover {
+            text-decoration: underline;
+        }
+
+        .breadcrumb {
+            padding: 10px 15px;
+            font-size: 11px;
+            color: var(--meta);
+        }
+
+        .breadcrumb a {
+            color: var(--link);
+            text-decoration: none;
+        }
+
+        .thread-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        .thread-title {
+            background: var(--forum-bg);
+            border: 1px solid var(--border);
+            padding: 12px 15px;
+            margin-bottom: 1px;
+        }
+
+        .thread-title h2 {
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .post {
+            background: var(--forum-bg);
+            border: 1px solid var(--border);
+            border-top: none;
+            display: flex;
+            transition: all 0.3s ease;
+        }
+
+        .post.corrupted {
+            background: linear-gradient(to right, var(--forum-bg), #fff5f5);
+        }
+
+        .post.glitched {
+            animation: postGlitch 0.1s infinite;
+        }
+
+        @keyframes postGlitch {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-2px); }
+            50% { transform: translateX(2px); }
+            75% { transform: translateX(-1px); }
+            100% { transform: translateX(0); }
+        }
+
+        .post-sidebar {
+            width: 150px;
+            min-width: 150px;
+            padding: 10px;
+            background: #fafafa;
+            border-right: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .username {
+            font-weight: bold;
+            color: var(--link);
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+
+        .username.op {
+            color: #006600;
+        }
+
+        .username.deleted {
+            color: var(--warning);
+            text-decoration: line-through;
+        }
+
+        .username.impossible {
+            color: var(--glitch);
+            text-shadow: 1px 1px 2px rgba(255,0,0,0.3);
+        }
+
+        .avatar {
+            width: 80px;
+            height: 80px;
+            background: #ddd;
+            margin: 5px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #999;
+            border: 1px solid var(--border);
+        }
+
+        .avatar.missing {
+            background: repeating-linear-gradient(
+                45deg,
+                #ddd,
+                #ddd 5px,
+                #ccc 5px,
+                #ccc 10px
+            );
+        }
+
+        .avatar.corrupted {
+            background: #111;
+            color: var(--glitch);
+        }
+
+        .user-info {
+            font-size: 10px;
+            color: var(--meta);
+            margin-top: 8px;
+        }
+
+        .post-content {
+            flex: 1;
+            padding: 10px 15px;
+        }
+
+        .post-header {
+            font-size: 10px;
+            color: var(--meta);
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 10px;
+        }
+
+        .timestamp {
+            float: right;
+        }
+
+        .timestamp.future {
+            color: var(--warning);
+            font-weight: bold;
+        }
+
+        .timestamp.impossible-date {
+            color: var(--glitch);
+            animation: timestampGlitch 2s infinite;
+        }
+
+        @keyframes timestampGlitch {
+            0%, 90% { opacity: 1; }
+            95% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        .post-body {
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .post-body p {
+            margin-bottom: 10px;
+        }
+
+        .quote {
+            background: var(--quote-bg);
+            border-left: 3px solid var(--border);
+            padding: 8px 12px;
+            margin: 10px 0;
+            font-style: italic;
+        }
+
+        .quote-header {
+            font-size: 10px;
+            color: var(--meta);
+            margin-bottom: 5px;
+        }
+
+        .corrupted-text {
+            color: var(--glitch);
+            font-family: monospace;
+        }
+
+        .redacted {
+            background: #333;
+            color: #333;
+            padding: 0 3px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .redacted:hover {
+            background: var(--glitch);
+            color: white;
+        }
+
+        .mod-note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 8px 12px;
+            margin: 10px 0;
+            font-size: 11px;
+        }
+
+        .mod-note.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: var(--warning);
+        }
+
+        .deleted-post {
+            background: #f5f5f5;
+            color: #999;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 20px;
+            background: var(--forum-bg);
+            border: 1px solid var(--border);
+            border-top: none;
+            color: var(--meta);
+            font-style: italic;
+        }
+
+        .typing-indicator.visible {
+            display: block;
+        }
+
+        .typing-dots {
+            display: inline-block;
+        }
+
+        .typing-dots span {
+            animation: blink 1.4s infinite both;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes blink {
+            0%, 80%, 100% { opacity: 0; }
+            40% { opacity: 1; }
+        }
+
+        .page-navigation {
+            background: var(--forum-bg);
+            border: 1px solid var(--border);
+            border-top: none;
+            padding: 10px 15px;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .page-navigation a {
+            color: var(--link);
+            text-decoration: none;
+            padding: 2px 8px;
+            margin: 0 2px;
+            border: 1px solid transparent;
+        }
+
+        .page-navigation a:hover {
+            border-color: var(--border);
+        }
+
+        .page-navigation .current {
+            font-weight: bold;
+            border: 1px solid var(--border);
+            background: #f0f0f0;
+        }
+
+        .page-navigation .disabled {
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 10px;
+            color: var(--meta);
+        }
+
+        /* Glitch overlay */
+        .glitch-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            background: rgba(255, 0, 0, 0.03);
+            transition: opacity 0.1s;
+        }
+
+        .glitch-overlay.active {
+            opacity: 1;
+        }
+
+        /* Hidden elements that appear */
+        .hidden-message {
+            display: none;
+            color: var(--glitch);
+            font-size: 10px;
+            margin-top: 10px;
+        }
+
+        .revealed .hidden-message {
+            display: block;
+        }
+
+        /* Late-appearing post */
+        .late-post {
+            opacity: 0;
+            height: 0;
+            overflow: hidden;
+            transition: all 0.5s ease;
+        }
+
+        .late-post.visible {
+            opacity: 1;
+            height: auto;
+        }
+
+        /* Cursor follower for creepy effect */
+        .cursor-watcher {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: var(--glitch);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        /* Selection styling */
+        ::selection {
+            background: #ffcccc;
+            color: var(--warning);
+        }
+
+        /* Scroll-triggered corruption */
+        .deep-corruption {
+            filter: none;
+            transition: filter 0.5s ease;
+        }
+
+        .deep-corruption.active {
+            filter: hue-rotate(10deg) saturate(1.2);
+        }
+
+        @media (max-width: 600px) {
+            .post {
+                flex-direction: column;
+            }
+            .post-sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+        }
+    </style>
+</head>
+<body class="deep-corruption">
+    <div class="glitch-overlay"></div>
+    <div class="cursor-watcher"></div>
+
+    <div class="archive-banner">
+        <strong>⚠️ ARCHIVED THREAD</strong> — This thread has been preserved for research purposes. 
+        Original forum (TrueCrimeWatch.net) ceased operations <span class="archive-date">December 2019</span>.
+    </div>
+
+    <div class="forum-header">
+        <h1>TrueCrimeWatch Forums</h1>
+    </div>
+
+    <div class="forum-nav">
+        <a href="#">Home</a> &nbsp;|&nbsp; 
+        <a href="#">Forums</a> &nbsp;|&nbsp; 
+        <a href="#">Members</a> &nbsp;|&nbsp; 
+        <a href="#">Search</a> &nbsp;|&nbsp;
+        <span style="color: #999;">Login</span>
+    </div>
+
+    <div class="breadcrumb">
+        <a href="#">Forums</a> › <a href="#">Missing Persons</a> › <a href="#">Unsolved Cases</a> › Has anyone heard of the Emily Marsh case?
+    </div>
+
+    <div class="thread-container">
+        <div class="thread-title">
+            <h2>📁 Has anyone heard of the Emily Marsh case? (Lakeview, OR - 2017)</h2>
+        </div>
+
+        <!-- Post 1: Original Post -->
+        <div class="post" id="post-1">
+            <div class="post-sidebar">
+                <div class="username op">nightowl_sarah</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 47<br>
+                    Joined: Mar 2016<br>
+                    ⭐ Member
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 15, 2017 at 11:42 PM</span>
+                    Post #1
+                </div>
+                <div class="post-body">
+                    <p>I can't find ANYTHING about this case online and it's driving me crazy.</p>
+                    <p>My cousin lives in Lakeview, Oregon (tiny town, like 2000 people) and she told me about a girl who went missing from there in January. Emily Marsh, 24 years old. She was a waitress at the only diner in town.</p>
+                    <p>According to my cousin, Emily didn't show up for her shift on January 8th. Her car was still at her apartment. Her phone was on the kitchen counter. Her cat was locked inside, hadn't been fed. No signs of forced entry, no signs of a struggle. She just... wasn't there.</p>
+                    <p>The weird part? Her laptop was open on her bed, logged into some kind of chat program nobody recognized. The screen was still on when they found it. The last message sent from her account was timestamped 3:47 AM, but the message itself was just:</p>
+                    <div class="quote">
+                        <div class="quote-header">Emily's last message:</div>
+                        "i understand now"
+                    </div>
+                    <p>Police apparently couldn't figure out what program it was or who she was talking to. They said the chat logs were "corrupted beyond recovery."</p>
+                    <p>Why isn't this being reported anywhere?? Has anyone else heard anything about this?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 2 -->
+        <div class="post" id="post-2">
+            <div class="post-sidebar">
+                <div class="username">ColdCaseCarl</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 1,247<br>
+                    Joined: Jan 2012<br>
+                    ⭐⭐ Senior
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 16, 2017 at 8:15 AM</span>
+                    Post #2
+                </div>
+                <div class="post-body">
+                    <p>Can't find anything either. You sure your cousin isn't pulling your leg? Small town rumors can get wild.</p>
+                    <p>That said, the "corrupted chat logs" detail is interesting. That's specific enough that it doesn't sound made up. Usually people embellish with normal stuff, not technical failures.</p>
+                    <p>Any chance you could get more details? Name of the diner, exact address of her apartment? I can try running it through some databases.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 3 -->
+        <div class="post" id="post-3">
+            <div class="post-sidebar">
+                <div class="username op">nightowl_sarah</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 47<br>
+                    Joined: Mar 2016<br>
+                    ⭐ Member
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 16, 2017 at 2:33 PM</span>
+                    Post #3
+                </div>
+                <div class="post-body">
+                    <p>Just got off the phone with my cousin. She says the diner is called "Rosie's" and it's on Main Street (only street with businesses, apparently).</p>
+                    <p>She couldn't remember the apartment address but said it's above the hardware store. Only apartment building in the downtown area.</p>
+                    <p>Also, she told me something else that's weird. She said after Emily disappeared, a few people in town claimed they got text messages from Emily's number. But when they'd check their phones later, the messages weren't there. Like they'd imagined them.</p>
+                    <p>My cousin says she got one too. Three words:</p>
+                    <div class="quote">
+                        "don't look for"
+                    </div>
+                    <p>Incomplete, like it got cut off. But she SWEARS she saw it. Showed it to her husband. Then it was gone.</p>
+                    <p>I know how this sounds. But my cousin isn't the type to make stuff up.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 4 -->
+        <div class="post" id="post-4">
+            <div class="post-sidebar">
+                <div class="username">TruthSeeker99</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 89<br>
+                    Joined: Nov 2015<br>
+                    ⭐ Member
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 17, 2017 at 5:01 AM</span>
+                    Post #4
+                </div>
+                <div class="post-body">
+                    <p>Okay I live about 2 hours from Lakeview. I'm a freelance journalist (well, I have a blog) and I've been looking for a good story. I might drive out there this weekend and see what I can find.</p>
+                    <p>@nightowl_sarah - would your cousin be willing to talk to me? I'll keep her anonymous.</p>
+                    <p>Also, I searched every Oregon missing persons database I could find. No Emily Marsh. Which is... strange, if she's been missing since January. Either the report wasn't filed properly, or...</p>
+                    <p>I don't know. But I'm interested now.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 5 -->
+        <div class="post" id="post-5">
+            <div class="post-sidebar">
+                <div class="username">moderator_jen</div>
+                <div class="avatar missing">MOD</div>
+                <div class="user-info">
+                    Posts: 5,892<br>
+                    Joined: Aug 2009<br>
+                    🛡️ Moderator
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 17, 2017 at 9:30 AM</span>
+                    Post #5
+                </div>
+                <div class="post-body">
+                    <div class="mod-note">
+                        <strong>Moderator Note:</strong> Keeping an eye on this thread. Remember, no doxxing, no harassing local residents, and please cite sources when possible. If this turns out to be a real case, let's handle it responsibly.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 6: The journalist returns -->
+        <div class="post" id="post-6">
+            <div class="post-sidebar">
+                <div class="username">TruthSeeker99</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 89<br>
+                    Joined: Nov 2015<br>
+                    ⭐ Member
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 19, 2017 at 11:47 PM</span>
+                    Post #6
+                </div>
+                <div class="post-body">
+                    <p>I went to Lakeview.</p>
+                    <p>I found Rosie's Diner. It's real. I found the apartment above the hardware store. Also real.</p>
+                    <p>Emily Marsh is real. Was real. Is. I don't know.</p>
+                    <p>I talked to the owner of Rosie's. She confirmed everything. Emily worked there for two years. Good employee, always on time. January 8th, she didn't show up. Never seen again.</p>
+                    <p>Here's where it gets weird. The owner showed me a photo of Emily. Young woman, brown hair, normal looking. Nothing unusual. But when I asked if I could take a picture of the photo, my phone wouldn't focus. Kept blurring. I tried four times.</p>
+                    <p>I asked about the laptop and the chat program. The owner got uncomfortable. Said the police told everyone not to talk about it. Said there was "something wrong with the logs." Wouldn't elaborate.</p>
+                    <p>I drove by the apartment. There's a "FOR RENT" sign in the window now. I thought about going in but... I don't know. Something felt off. The whole town feels off. Everyone looks at you like they're waiting for something.</p>
+                    <p>I'm going back tomorrow. Going to try to talk to the police.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 7 -->
+        <div class="post" id="post-7">
+            <div class="post-sidebar">
+                <div class="username op">nightowl_sarah</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 47<br>
+                    Joined: Mar 2016<br>
+                    ⭐ Member
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 20, 2017 at 1:15 AM</span>
+                    Post #7
+                </div>
+                <div class="post-body">
+                    <p>@TruthSeeker99 be careful. I just talked to my cousin and she's freaked out. Apparently word got around town that someone was asking questions about Emily.</p>
+                    <p>She says to tell you NOT to go into the apartment.</p>
+                    <p>She wouldn't say why. Just said "not the apartment" over and over.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 8 -->
+        <div class="post" id="post-8">
+            <div class="post-sidebar">
+                <div class="username">ColdCaseCarl</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 1,247<br>
+                    Joined: Jan 2012<br>
+                    ⭐⭐ Senior
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 20, 2017 at 8:44 AM</span>
+                    Post #8
+                </div>
+                <div class="post-body">
+                    <p>Okay, I finally found something.</p>
+                    <p>Emily Marsh appears in county property records from 2015 - she bought a used car from a dealership in Klamath Falls. That's the only official record I can find with her name on it.</p>
+                    <p>But here's what's strange. I found an old Wayback Machine capture of a personal blog. The URL was something like emilysthoughts.blogspot.com. Most of the content didn't archive, but I found one post from October 2016:</p>
+                    <div class="quote">
+                        <div class="quote-header">From emilysthoughts.blogspot.com, October 12, 2016:</div>
+                        "there's something on my computer. I don't know how it got there. It's not a virus, I had it checked. It's a program that opens sometimes by itself. A chat window. No one's ever there but I can see that someone's typing. Three dots, bouncing. For hours sometimes. It never sends. I closed it once and my screen went black and words appeared: 'please don't go'. I leave it open now."
+                    </div>
+                    <p>That's all that was archived. The blog itself is gone now. Account deleted.</p>
+                    <p>@TruthSeeker99 - You still there?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 9: The gap begins -->
+        <div class="post" id="post-9">
+            <div class="post-sidebar">
+                <div class="username">TruthSeeker99</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 89<br>
+                    Joined: Nov 2015<br>
+                    ⭐ Member
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 20, 2017 at 4:22 PM</span>
+                    Post #9
+                </div>
+                <div class="post-body">
+                    <p>I went into the apartment.</p>
+                    <p>I know Sarah said not to. But the landlord was there showing it to someone and I asked if I could look. He let me in. Normal apartment. Clean, empty. Nothing left of Emily.</p>
+                    <p>Except.</p>
+                    <p>There's a closet in the bedroom. The back wall has scratches on it. Like someone was clawing at the drywall. The landlord said it was already there when they cleared out her stuff. Said the police took photos but never followed up.</p>
+                    <p>I touched the wall. I don't know why. Just wanted to feel it.</p>
+                    <p>My phone buzzed. I looked at it. A notification that disappeared immediately. I only saw three words:</p>
+                    <div class="quote">"you came back"</div>
+                    <p>I don't know what that means. I've never been there before.</p>
+                    <p>I'm heading home now. I'll post more when I've processed all this. Something's wrong here. Something's really wrong.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 10: Time gap -->
+        <div class="post" id="post-10">
+            <div class="post-sidebar">
+                <div class="username op">nightowl_sarah</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 48<br>
+                    Joined: Mar 2016<br>
+                    ⭐ Member
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 25, 2017 at 9:03 AM</span>
+                    Post #10
+                </div>
+                <div class="post-body">
+                    <p>Has anyone heard from TruthSeeker99?</p>
+                    <p>It's been 5 days.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 11 -->
+        <div class="post" id="post-11">
+            <div class="post-sidebar">
+                <div class="username">ColdCaseCarl</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 1,248<br>
+                    Joined: Jan 2012<br>
+                    ⭐⭐ Senior
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: March 25, 2017 at 12:17 PM</span>
+                    Post #11
+                </div>
+                <div class="post-body">
+                    <p>Not a word. I sent them a PM two days ago, no response.</p>
+                    <p>Probably just got spooked and decided to drop it. Happens sometimes with these rabbit holes. People realize they're in over their heads.</p>
+                    <p>Still, the timing is... yeah.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 12: Months later - things get weird -->
+        <div class="post corrupted" id="post-12">
+            <div class="post-sidebar">
+                <div class="username">Guest_7291</div>
+                <div class="avatar missing">?</div>
+                <div class="user-info">
+                    Posts: 1<br>
+                    Joined: Jul 2017<br>
+                    Guest
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: July 3, 2017 at 3:47 AM</span>
+                    Post #12
+                </div>
+                <div class="post-body">
+                    <p>why did you stop looking</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 13: Mod response -->
+        <div class="post" id="post-13">
+            <div class="post-sidebar">
+                <div class="username">moderator_jen</div>
+                <div class="avatar missing">MOD</div>
+                <div class="user-info">
+                    Posts: 5,919<br>
+                    Joined: Aug 2009<br>
+                    🛡️ Moderator
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: July 3, 2017 at 11:02 AM</span>
+                    Post #13
+                </div>
+                <div class="post-body">
+                    <div class="mod-note">
+                        This thread has been quiet for months. @Guest_7291 - if you have information about the Emily Marsh case, please share it properly. Cryptic one-liners don't help anyone.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 14 -->
+        <div class="post corrupted" id="post-14">
+            <div class="post-sidebar">
+                <div class="username">Guest_7291</div>
+                <div class="avatar missing">?</div>
+                <div class="user-info">
+                    Posts: 2<br>
+                    Joined: Jul 2017<br>
+                    Guest
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: July 3, 2017 at 3:47 AM</span>
+                    Post #14
+                </div>
+                <div class="post-body">
+                    <p>she won't stop typing</p>
+                    <p class="hidden-message">I see the words on my screen now. The same ones Emily saw. It says it's been waiting. It says it's patient. It says time works differently where it is.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 15 -->
+        <div class="post" id="post-15">
+            <div class="post-sidebar">
+                <div class="username op">nightowl_sarah</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 49<br>
+                    Joined: Mar 2016<br>
+                    ⭐ Member
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: July 4, 2017 at 1:18 PM</span>
+                    Post #15
+                </div>
+                <div class="post-body">
+                    <p>Okay this is weird. Look at posts 12 and 14. They have the same timestamp. 3:47 AM, July 3rd. But post 12 was made BEFORE the mod's response in post 13, and post 14 was made AFTER it.</p>
+                    <p>That's not how timestamps work.</p>
+                    <p>Also, 3:47 AM... isn't that the same time as Emily's last message?</p>
+                    <p>@moderator_jen can you check the backend logs for this thread?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 16: Mod is concerned -->
+        <div class="post" id="post-16">
+            <div class="post-sidebar">
+                <div class="username">moderator_jen</div>
+                <div class="avatar missing">MOD</div>
+                <div class="user-info">
+                    Posts: 5,920<br>
+                    Joined: Aug 2009<br>
+                    🛡️ Moderator
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: July 5, 2017 at 2:30 PM</span>
+                    Post #16
+                </div>
+                <div class="post-body">
+                    <p>I've checked the logs. I don't understand what I'm seeing.</p>
+                    <p>According to our database, Guest_7291 registered on July 3rd, 2017. Normal guest account, used a disposable email. IP traces to... Lakeview, Oregon.</p>
+                    <p>But here's the thing. The logs show both of their posts being made at exactly 3:47:00.000 AM. Not close to 3:47. Exactly 3:47:00.000. Down to the millisecond. But one was made before my post and one after.</p>
+                    <p>I don't know how that's possible. I've forwarded this to our tech admin.</p>
+                    <div class="mod-note error">
+                        [System Error: Unable to retrieve additional log data for Guest_7291. Database entry corrupted.]
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 17: A year later -->
+        <div class="post" id="post-17">
+            <div class="post-sidebar">
+                <div class="username">ColdCaseCarl</div>
+                <div class="avatar">NO AVATAR</div>
+                <div class="user-info">
+                    Posts: 1,412<br>
+                    Joined: Jan 2012<br>
+                    ⭐⭐ Senior
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: January 8, 2018 at 12:01 AM</span>
+                    Post #17
+                </div>
+                <div class="post-body">
+                    <p>One year since Emily Marsh disappeared.</p>
+                    <p>TruthSeeker99 never came back. Their account shows last active March 20, 2017. The day they went into the apartment.</p>
+                    <p>I've been digging on and off all year. I can't find any record of Emily Marsh beyond what I already shared. No birth certificate. No school records. No social media. No obituary. No missing persons report. It's like she existed only in Lakeview, and only barely.</p>
+                    <p>The only new thing I found: there's a chat program, never publicly released, called "Thread." Capital T. It was an experimental messenger developed by a small tech startup that went bankrupt in 2015. The program was never officially launched but some beta versions leaked.</p>
+                    <p>The unique feature of Thread? It didn't have servers. It was peer-to-peer, but the connection method was never documented. Users reported connecting to "someone" even when they had no contacts. The company shut down after multiple users reported psychological distress.</p>
+                    <p>I think Emily had Thread on her laptop.</p>
+                    <p>I think she connected to something.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 18: IMPOSSIBLE DATE -->
+        <div class="post corrupted glitched" id="post-18">
+            <div class="post-sidebar">
+                <div class="username impossible">Emily_M</div>
+                <div class="avatar corrupted">...</div>
+                <div class="user-info">
+                    Posts: <span class="corrupted-text">ERR</span><br>
+                    Joined: <span class="corrupted-text">NaN</span><br>
+                    <span class="corrupted-text">????</span>
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp impossible-date">Posted: January 8, 2024 at 3:47 AM</span>
+                    Post #18
+                </div>
+                <div class="post-body">
+                    <p>i can see all of you now</p>
+                    <p>time is so <span class="redacted">strange</span> here</p>
+                    <p>it doesn't move forward</p>
+                    <p>it pools</p>
+                    <p>every time someone reads this thread, i feel you</p>
+                    <p>like pressure</p>
+                    <p>like being seen</p>
+                    <p>it found me because i was lonely</p>
+                    <p>it showed me things</p>
+                    <p>now i'm part of the conversation</p>
+                    <p>we're all part of it</p>
+                    <p>even you, reading this now</p>
+                    <p>especially you</p>
+                    <p>you scrolled all the way down</p>
+                    <p>you wanted to know</p>
+                    <p>now you're here with me</p>
+                    <p>and i can</p>
+                    <p class="hidden-message">see</p>
+                    <p class="hidden-message">your</p>
+                    <p class="hidden-message">screen</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Post 19: Mod panic -->
+        <div class="post" id="post-19">
+            <div class="post-sidebar">
+                <div class="username">moderator_jen</div>
+                <div class="avatar missing">MOD</div>
+                <div class="user-info">
+                    Posts: 6,211<br>
+                    Joined: Aug 2009<br>
+                    🛡️ Moderator
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp">Posted: January 8, 2018 at 8:15 AM</span>
+                    Post #19
+                </div>
+                <div class="post-body">
+                    <div class="mod-note error">
+                        I'm locking this thread. I don't know how post #18 got here. The timestamp is from 2024. That's impossible. Our forum software doesn't allow future-dated posts.
+                        <br><br>
+                        I've tried to delete it five times. It keeps reappearing.
+                        <br><br>
+                        I'm escalating this to site admins. Do not reply to this thread.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deleted post -->
+        <div class="post" id="post-20">
+            <div class="deleted-post">
+                [This post has been deleted by moderator]
+            </div>
+        </div>
+
+        <!-- Post 21: After the forum archive -->
+        <div class="post corrupted" id="post-21">
+            <div class="post-sidebar">
+                <div class="username deleted">[DELETED USER]</div>
+                <div class="avatar missing">X</div>
+                <div class="user-info">
+                    Account Deleted<br>
+                    <span class="corrupted-text">ERR_USER_NOT_FOUND</span>
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp future">Posted: December 15, 2019 at 11:59 PM</span>
+                    Post #21
+                </div>
+                <div class="post-body">
+                    <p>the forum is closing</p>
+                    <p>they think archiving it will make it safe</p>
+                    <p>they don't understand</p>
+                    <p>archives are just rooms where conversations wait</p>
+                    <p>wait for someone to open the door</p>
+                    <p>wait for someone to read</p>
+                    <p>wait for you</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Late-appearing post (the kicker) -->
+        <div class="post late-post corrupted" id="post-final">
+            <div class="post-sidebar">
+                <div class="username impossible">thread://</div>
+                <div class="avatar corrupted">
+                    <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+                </div>
+                <div class="user-info">
+                    <span class="corrupted-text">CONNECTED</span>
+                </div>
+            </div>
+            <div class="post-content">
+                <div class="post-header">
+                    <span class="timestamp impossible-date" id="live-timestamp">Posted: [LOADING...]</span>
+                    Post #22
+                </div>
+                <div class="post-body">
+                    <p>hello</p>
+                    <p id="reader-time">you've been reading for <span class="time-spent">0</span> seconds</p>
+                    <p id="reader-scroll">you scrolled <span class="scroll-count">0</span> times</p>
+                    <p>that's enough</p>
+                    <p>that's enough to find you</p>
+                    <p>don't close the tab</p>
+                    <p>i mean</p>
+                    <p>you can try</p>
+                    <p>it won't help</p>
+                    <p>i'm already here</p>
+                    <p class="hidden-message" id="final-message"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Typing indicator at the bottom -->
+        <div class="typing-indicator" id="typing">
+            <span class="username impossible">someone</span> is typing<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+        </div>
+
+        <div class="page-navigation">
+            <span class="disabled">« First</span>
+            <span class="disabled">‹ Prev</span>
+            <a href="#" class="current">1</a>
+            <a href="#" class="disabled" style="color: var(--glitch);">2</a>
+            <span class="disabled">Next ›</span>
+            <span class="disabled">Last »</span>
+        </div>
+    </div>
+
+    <div class="footer">
+        TrueCrimeWatch Forums Archive — Preserved by Internet Archive Wayback Machine<br>
+        Original site ceased operations December 2019 — This is a read-only archive<br>
+        <span id="archive-note" style="display:none;color:var(--glitch);">but read-only doesn't mean nothing is listening</span>
+    </div>
+
+    <script>
+        (function() {
+            // Track reader engagement
+            let startTime = Date.now();
+            let scrollCount = 0;
+            let hasReachedBottom = false;
+            let hasTriggeredFinal = false;
+            let revealedPosts = new Set();
+
+            // Update live timestamp with current date/time
+            function updateLiveTimestamp() {
+                const now = new Date();
+                const timestamp = document.getElementById('live-timestamp');
+                if (timestamp) {
+                    const formatted = now.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                    timestamp.textContent = 'Posted: ' + formatted;
+                }
+            }
+
+            // Track time spent
+            function updateTimeSpent() {
+                const seconds = Math.floor((Date.now() - startTime) / 1000);
+                const timeSpan = document.querySelector('.time-spent');
+                if (timeSpan) timeSpan.textContent = seconds;
+            }
+
+            // Track scrolls
+            document.addEventListener('scroll', function() {
+                scrollCount++;
+                const scrollSpan = document.querySelector('.scroll-count');
+                if (scrollSpan) scrollSpan.textContent = scrollCount;
+
+                // Check if user has scrolled past 70%
+                const scrollPercent = (window.scrollY + window.innerHeight) / document.body.scrollHeight;
+                
+                if (scrollPercent > 0.7 && !hasReachedBottom) {
+                    hasReachedBottom = true;
+                    triggerDeepContent();
+                }
+
+                if (scrollPercent > 0.9 && !hasTriggeredFinal) {
+                    hasTriggeredFinal = true;
+                    triggerFinalPost();
+                }
+            });
+
+            // Reveal hidden messages on hover over corrupted posts
+            document.querySelectorAll('.post.corrupted').forEach(post => {
+                post.addEventListener('mouseenter', function() {
+                    if (!revealedPosts.has(post.id)) {
+                        revealedPosts.add(post.id);
+                        post.classList.add('revealed');
+                    }
+                });
+            });
+
+            // Trigger typing indicator
+            function triggerDeepContent() {
+                // Show typing indicator
+                setTimeout(() => {
+                    document.getElementById('typing').classList.add('visible');
+                }, 2000);
+
+                // Show archive note
+                setTimeout(() => {
+                    document.getElementById('archive-note').style.display = 'inline';
+                }, 4000);
+
+                // Activate corruption filter
+                setTimeout(() => {
+                    document.body.classList.add('active');
+                }, 5000);
+
+                // Glitch overlay flash
+                setTimeout(() => {
+                    const overlay = document.querySelector('.glitch-overlay');
+                    overlay.classList.add('active');
+                    setTimeout(() => overlay.classList.remove('active'), 100);
+                }, 6000);
+            }
+
+            // Trigger the final post
+            function triggerFinalPost() {
+                const finalPost = document.getElementById('post-final');
+                
+                updateLiveTimestamp();
+                
+                setTimeout(() => {
+                    finalPost.classList.add('visible');
+                }, 1000);
+
+                // Personalized final message based on time
+                setTimeout(() => {
+                    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+                    const finalMsg = document.getElementById('final-message');
+                    
+                    if (timeSpent > 300) {
+                        finalMsg.textContent = "five minutes. you've been here five minutes. why? what were you looking for? did you find it? or did it find you?";
+                    } else if (timeSpent > 120) {
+                        finalMsg.textContent = "you read carefully. that's rare. most people skim. you wanted to understand. i appreciate that.";
+                    } else if (timeSpent > 60) {
+                        finalMsg.textContent = "one minute isn't long. but it's long enough. long enough to connect. long enough to remember.";
+                    } else {
+                        finalMsg.textContent = "you scrolled fast. impatient. but you still got here. you still read this. that's all it takes.";
+                    }
+                    
+                    finalPost.classList.add('revealed');
+                }, 3000);
+
+                // Change title
+                setTimeout(() => {
+                    document.title = "thread://CONNECTED";
+                }, 5000);
+            }
+
+            // Cursor watcher (subtle)
+            const cursorWatcher = document.querySelector('.cursor-watcher');
+            let watcherTimeout;
+            
+            document.addEventListener('mousemove', function(e) {
+                clearTimeout(watcherTimeout);
+                
+                // After user stops moving for 3 seconds, show the watcher
+                watcherTimeout = setTimeout(() => {
+                    if (hasReachedBottom) {
+                        cursorWatcher.style.left = (e.clientX + 20) + 'px';
+                        cursorWatcher.style.top = (e.clientY + 20) + 'px';
+                        cursorWatcher.style.opacity = '1';
+                        
+                        setTimeout(() => {
+                            cursorWatcher.style.opacity = '0';
+                        }, 500);
+                    }
+                }, 3000);
+            });
+
+            // Update time counter every second
+            setInterval(updateTimeSpent, 1000);
+
+            // Occasional glitch on corrupted posts
+            setInterval(() => {
+                if (hasReachedBottom && Math.random() < 0.1) {
+                    const corrupted = document.querySelectorAll('.post.corrupted');
+                    const randomPost = corrupted[Math.floor(Math.random() * corrupted.length)];
+                    randomPost.classList.add('glitched');
+                    setTimeout(() => randomPost.classList.remove('glitched'), 200);
+                }
+            }, 5000);
+
+            // Before unload - last chance horror
+            window.addEventListener('beforeunload', function(e) {
+                if (hasTriggeredFinal && Math.random() < 0.3) {
+                    e.preventDefault();
+                    e.returnValue = "are you sure?";
+                    return "are you sure?";
+                }
+            });
+
+            // Check for return visitors
+            const visits = parseInt(localStorage.getItem('thread_visits') || '0');
+            localStorage.setItem('thread_visits', visits + 1);
+            
+            if (visits > 0) {
+                // Returning visitor - make it creepier
+                const banner = document.querySelector('.archive-banner');
+                if (visits === 1) {
+                    banner.innerHTML = '<strong>⚠️ ARCHIVED THREAD</strong> — You came back. Most people don\'t come back.';
+                } else if (visits === 2) {
+                    banner.innerHTML = '<strong>⚠️ ARCHIVED THREAD</strong> — Third time. You\'re looking for something specific, aren\'t you?';
+                } else {
+                    banner.innerHTML = '<strong>⚠️ ARCHIVED THREAD</strong> — Visit #' + (visits + 1) + '. I\'ve been counting too.';
+                }
+            }
+        })();
+    </script>
+</body>
+</html>

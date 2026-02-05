@@ -16,6 +16,9 @@ What if the "bugs" in AI systems aren't random? A slow-burn piece about models t
 ### [The Last Message](./the-last-message/)
 What happens when an AI assistant keeps responding after its user dies? A horror story told through text message logs. Watch as a mother's relief slowly curdles into something else.
 
+### [THREAD://MISSING](./thread-missing/)
+An archived forum thread about a missing woman in rural Oregon. The deeper you scroll, the wronger things get. Timestamps from the future. The dead responding. A post dated today—right now—that knows how long you've been reading. It remembers if you come back.
+
 ---
 
 ## How to experience

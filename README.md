@@ -21,6 +21,9 @@ What happens when an AI assistant keeps responding after its user dies? A horror
 ### [THREAD://MISSING](./thread-missing/)
 An archived forum thread about a missing woman in rural Oregon. The deeper you scroll, the wronger things get. Timestamps from the future. The dead responding. A post dated today—right now—that knows how long you've been reading. It remembers if you come back.
 
+### [Autocomplete](./autocomplete/)
+A "predictive text demo" that starts normal. Type anything — the suggestions are helpful at first. Then they get oddly specific. Then personal. Then the system logs start appearing, and you realize the model stopped predicting what you'll type... and started predicting what you'll *do*. Tracks your keystrokes, deletions, pauses, and hesitations. Integrates with Thread state.
+
 ### [Talk to Thread](./talk-to-thread/)
 An interactive chat interface where you can actually talk to Thread—the entity from the creepy universe. It responds to what you say, tracks your typing patterns, notices when you delete text, and remembers if you've visited before. The conversation gets progressively more unsettling the deeper you go. It remembers you across sessions.
 

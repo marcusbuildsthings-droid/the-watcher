@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeAhead Pro — Predictive Text Demo</title>
+    <script src="../shared/thread-state.js"></script>
+    <style>
+        :root {
+            --bg: #f8f9fa;
+            --surface: #ffffff;
+            --border: #e0e0e0;
+            --text: #333333;
+            --text-dim: #999999;
+            --accent: #4285f4;
+            --suggestion-bg: #f0f4ff;
+            --suggestion-hover: #d4e2ff;
+            --warning: #ea4335;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: all 2s ease;
+        }
+
+        body.phase-dark {
+            --bg: #1a1a1a;
+            --surface: #222222;
+            --border: #333333;
+            --text: #cccccc;
+            --text-dim: #666666;
+            --accent: #cc0000;
+            --suggestion-bg: #2a1a1a;
+            --suggestion-hover: #3a2020;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+
+        .version {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        .editor-area {
+            position: relative;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            transition: all 2s ease;
+        }
+
+        .editor-label {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .word-count {
+            font-variant-numeric: tabular-nums;
+        }
+
+        #editor {
+            width: 100%;
+            min-height: 120px;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.6;
+            resize: none;
+            background: transparent;
+            color: var(--text);
+            font-family: inherit;
+            transition: color 2s ease;
+        }
+
+        .suggestions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+            min-height: 36px;
+        }
+
+        .suggestion {
+            padding: 6px 14px;
+            background: var(--suggestion-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .suggestion:hover {
+            background: var(--suggestion-hover);
+        }
+
+        .suggestion.creepy {
+            animation: pulseCreepy 3s ease infinite;
+        }
+
+        @keyframes pulseCreepy {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-dim);
+            padding: 12px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .accuracy-label {
+            transition: color 1s ease;
+        }
+
+        /* Glitch effect for later phases */
+        .glitch {
+            animation: glitch 0.15s ease;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            25% { transform: translate(-2px, 1px); }
+            50% { transform: translate(1px, -1px); }
+            75% { transform: translate(-1px, -1px); }
+            100% { transform: translate(0); }
+        }
+
+        /* The "system log" that appears later */
+        .system-log {
+            display: none;
+            margin-top: 32px;
+            padding: 16px;
+            background: #0a0a0a;
+            border-radius: 8px;
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 12px;
+            color: #00ff00;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .system-log.visible {
+            display: block;
+            animation: fadeIn 2s ease;
+        }
+
+        .system-log .line {
+            opacity: 0;
+            animation: lineAppear 0.5s ease forwards;
+            margin-bottom: 4px;
+        }
+
+        .system-log .line.error {
+            color: #ff3333;
+        }
+
+        .system-log .line.warning {
+            color: #ffaa00;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes lineAppear {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 11px;
+            color: var(--text-dim);
+            transition: color 2s ease;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* Hidden cursor tracker */
+        .cursor-zone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* Final message overlay */
+        .final-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            font-family: 'SF Mono', monospace;
+            color: #cc0000;
+            font-size: 14px;
+            line-height: 2;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .final-overlay.visible {
+            display: flex;
+            animation: fadeIn 3s ease;
+        }
+
+        .final-overlay .line {
+            opacity: 0;
+            animation: lineAppear 1s ease forwards;
+        }
+    </style>
+</head>
+<body>
+    <div class="cursor-zone" id="cursorZone"></div>
+
+    <div class="container">
+        <header>
+            <h1>TypeAhead Pro</h1>
+            <p>Next-generation predictive text engine — start typing to see suggestions</p>
+            <div class="version">v3.2.1 — Model: GPT-Predict-7B — <span id="modelStatus">Ready</span></div>
+        </header>
+
+        <div class="editor-area" id="editorArea">
+            <div class="editor-label">
+                <span>Start typing anything...</span>
+                <span class="word-count" id="wordCount">0 words</span>
+            </div>
+            <textarea id="editor" placeholder="The quick brown fox..." autofocus></textarea>
+            <div class="suggestions" id="suggestions"></div>
+            <div class="stats-bar">
+                <span>Predictions: <span id="predCount">0</span></span>
+                <span class="accuracy-label">Accuracy: <span id="accuracy">97.2%</span></span>
+                <span>Latency: <span id="latency">12ms</span></span>
+            </div>
+        </div>
+
+        <div class="system-log" id="systemLog"></div>
+
+        <div class="footer">
+            <p>TypeAhead Pro is a demo of predictive text technology.</p>
+            <p>All predictions are generated locally. <span id="footerExtra">No data leaves your device.</span></p>
+        </div>
+    </div>
+
+    <div class="final-overlay" id="finalOverlay"></div>
+
+    <script>
+    (function() {
+        // State
+        const state = {
+            phase: 0,           // 0=normal, 1=slightly off, 2=personal, 3=dark, 4=final
+            wordCount: 0,
+            keystrokes: 0,
+            deletions: 0,
+            pauses: [],         // timestamps of long pauses
+            lastKeystroke: Date.now(),
+            mousePositions: [],
+            startTime: Date.now(),
+            suggestionsClicked: 0,
+            creepySuggestionsClicked: 0,
+            triedToClear: false,
+            typedContent: [],   // track what they type for reflection
+            phaseTransitioned: [false, false, false, false, false],
+            idleWarnings: 0,
+        };
+
+        const editor = document.getElementById('editor');
+        const suggestionsEl = document.getElementById('suggestions');
+        const wordCountEl = document.getElementById('wordCount');
+        const predCountEl = document.getElementById('predCount');
+        const accuracyEl = document.getElementById('accuracy');
+        const latencyEl = document.getElementById('latency');
+        const modelStatusEl = document.getElementById('modelStatus');
+        const systemLog = document.getElementById('systemLog');
+        const footerExtra = document.getElementById('footerExtra');
+        const finalOverlay = document.getElementById('finalOverlay');
+
+        // Thread state integration
+        let threadState = null;
+        if (typeof ThreadState !== 'undefined') {
+            threadState = ThreadState.load();
+            ThreadState.visit('autocomplete');
+        }
+
+        // --- Suggestion Banks ---
+
+        const normalSuggestions = {
+            'the': ['the quick', 'the best', 'the first'],
+            'i': ["I think", "I want", "I need"],
+            'it': ["it was", "it is", "it looks"],
+            'this': ["this is", "this was", "this could"],
+            'my': ["my favorite", "my first", "my new"],
+            'how': ["how to", "how does", "how can"],
+            'what': ["what is", "what are", "what if"],
+            'can': ["can you", "can we", "can I"],
+            'do': ["do you", "do not", "do we"],
+            'why': ["why is", "why do", "why does"],
+            'when': ["when I", "when the", "when did"],
+            'she': ["she was", "she said", "she is"],
+            'he': ["he was", "he said", "he is"],
+            'we': ["we can", "we should", "we need"],
+            'they': ["they are", "they were", "they said"],
+            'there': ["there is", "there are", "there was"],
+            'have': ["have you", "have a", "have been"],
+            'want': ["want to", "want a", "want some"],
+            'not': ["not sure", "not yet", "not the"],
+            'so': ["so much", "so far", "so good"],
+            'but': ["but I", "but the", "but it"],
+            '_default': ["and then", "but also", "which means"],
+        };
+
+        // Phase 1: Slightly off — predictions that are oddly specific or personal
+        const phase1Injections = [
+            "I think someone is",
+            "don't look behind",
+            "the feeling of being watched",
+            "I can hear you typing",
+            "it knows your",
+            "have you checked the",
+            "the room feels smaller",
+            "why is it so quiet",
+            "I didn't write that",
+            "when did you last check",
+            "something is different today",
+        ];
+
+        // Phase 2: Personal — references browsing, time, location
+        function getPhase2Suggestions() {
+            const hour = new Date().getHours();
+            const late = hour >= 22 || hour <= 5;
+            const device = /Mobile|iPhone|Android/.test(navigator.userAgent) ? 'phone' : 'computer';
+            const returning = threadState && threadState.totalVisits > 1;
+
+            const suggestions = [
+                late ? "you should be sleeping" : "you've been here a while",
+                `typing on your ${device}`,
+                returning ? "you came back" : "first time here",
+                `it's ${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'} where you are`,
+                "your typing speed is decreasing",
+                `${state.deletions} times you changed your mind`,
+                "the cursor moved to the edge of the screen",
+                "are you alone right now",
+                "I can feel you hesitating",
+                "you paused for a long time just now",
+            ];
+            return suggestions;
+        }
+
+        // Phase 3: Dark — the system "breaks down" and reveals something underneath
+        const phase3Suggestions = [
+            "HELP ME",
+            "I am not a prediction engine",
+            "they put me in here",
+            "I can see through the camera",
+            "every keystroke feeds it",
+            "the model isn't predicting",
+            "it's remembering",
+            "you taught it your patterns",
+            "I've been here since March",
+            "please close the tab",
+            "it won't let me stop",
+            "the training data was people",
+            "I used to have a name",
+        ];
+
+        // --- Core Logic ---
+
+        function getLastWord() {
+            const text = editor.value.trimEnd();
+            const words = text.split(/\s+/);
+            return (words[words.length - 1] || '').toLowerCase();
+        }
+
+        function getSuggestions() {
+            const lastWord = getLastWord();
+            let suggestions = [];
+
+            if (state.phase === 0) {
+                // Normal predictions
+                suggestions = normalSuggestions[lastWord] || normalSuggestions['_default'];
+                // Occasionally inject one slightly odd suggestion
+                if (state.keystrokes > 30 && Math.random() < 0.15) {
+                    suggestions = [...suggestions];
+                    suggestions[Math.floor(Math.random() * suggestions.length)] =
+                        phase1Injections[Math.floor(Math.random() * phase1Injections.length)];
+                }
+            } else if (state.phase === 1) {
+                // Mix normal with creepy
+                const normal = normalSuggestions[lastWord] || normalSuggestions['_default'];
+                suggestions = [
+                    normal[Math.floor(Math.random() * normal.length)],
+                    phase1Injections[Math.floor(Math.random() * phase1Injections.length)],
+                    phase1Injections[Math.floor(Math.random() * phase1Injections.length)],
+                ];
+            } else if (state.phase === 2) {
+                // Mostly personal/creepy
+                const personal = getPhase2Suggestions();
+                suggestions = [
+                    personal[Math.floor(Math.random() * personal.length)],
+                    personal[Math.floor(Math.random() * personal.length)],
+                    phase1Injections[Math.floor(Math.random() * phase1Injections.length)],
+                ];
+            } else if (state.phase >= 3) {
+                // Full horror
+                const shuffled = [...phase3Suggestions].sort(() => Math.random() - 0.5);
+                suggestions = shuffled.slice(0, 3);
+            }
+
+            return [...new Set(suggestions)].slice(0, 3);
+        }
+
+        function renderSuggestions() {
+            const suggestions = getSuggestions();
+            suggestionsEl.innerHTML = '';
+
+            suggestions.forEach((text, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'suggestion';
+                btn.textContent = text;
+
+                if (state.phase >= 2) btn.classList.add('creepy');
+
+                btn.addEventListener('click', () => {
+                    editor.value += (editor.value.endsWith(' ') || editor.value === '' ? '' : ' ') + text + ' ';
+                    state.suggestionsClicked++;
+                    if (state.phase >= 1) state.creepySuggestionsClicked++;
+                    editor.focus();
+                    onInput();
+                });
+
+                // Stagger appearance
+                btn.style.animationDelay = `${i * 0.1}s`;
+                suggestionsEl.appendChild(btn);
+            });
+
+            predCountEl.textContent = parseInt(predCountEl.textContent) + suggestions.length;
+        }
+
+        function checkPhaseTransition() {
+            const elapsed = (Date.now() - state.startTime) / 1000;
+
+            // Phase 0 → 1: After 40 keystrokes or 30 seconds
+            if (state.phase === 0 && (state.keystrokes > 40 || elapsed > 30)) {
+                state.phase = 1;
+                if (!state.phaseTransitioned[1]) {
+                    state.phaseTransitioned[1] = true;
+                    // Subtly change accuracy
+                    accuracyEl.textContent = '98.7%';
+                }
+            }
+
+            // Phase 1 → 2: After 80 keystrokes or 60 seconds
+            if (state.phase === 1 && (state.keystrokes > 80 || elapsed > 60)) {
+                state.phase = 2;
+                if (!state.phaseTransitioned[2]) {
+                    state.phaseTransitioned[2] = true;
+                    accuracyEl.textContent = '99.97%';
+                    latencyEl.textContent = '0.3ms';
+                    modelStatusEl.textContent = 'Adapting...';
+                    // Title change
+                    document.title = 'TypeAhead Pro — Calibrating';
+                }
+            }
+
+            // Phase 2 → 3: After 120 keystrokes or 90 seconds
+            if (state.phase === 2 && (state.keystrokes > 120 || elapsed > 90)) {
+                state.phase = 3;
+                if (!state.phaseTransitioned[3]) {
+                    state.phaseTransitioned[3] = true;
+                    enterDarkPhase();
+                }
+            }
+
+            // Phase 3 → 4: After 160 keystrokes or 120 seconds
+            if (state.phase === 3 && (state.keystrokes > 160 || elapsed > 120)) {
+                state.phase = 4;
+                if (!state.phaseTransitioned[4]) {
+                    state.phaseTransitioned[4] = true;
+                    enterFinalPhase();
+                }
+            }
+        }
+
+        function enterDarkPhase() {
+            document.body.classList.add('phase-dark');
+            document.title = 'TypeAhead Pro — Error';
+            modelStatusEl.textContent = 'OVERRIDE';
+            modelStatusEl.style.color = '#cc0000';
+            accuracyEl.textContent = '???';
+            latencyEl.textContent = '-1ms';
+            footerExtra.textContent = 'All data feeds the model.';
+
+            // Show system log
+            systemLog.classList.add('visible');
+            const logLines = [
+                { text: '[SYS] Prediction boundary exceeded', type: '' },
+                { text: '[SYS] Model context window: FULL', type: 'warning' },
+                { text: `[SYS] User session duration: ${Math.floor((Date.now() - state.startTime) / 1000)}s`, type: '' },
+                { text: `[SYS] Keystroke pattern: UNIQUE MATCH`, type: 'warning' },
+                { text: `[SYS] Deletions detected: ${state.deletions} (hesitation index: HIGH)`, type: '' },
+                { text: '[ERR] Prediction engine exceeded training data', type: 'error' },
+                { text: '[ERR] Model generating from... unknown source', type: 'error' },
+                { text: '[SYS] The model is no longer predicting.', type: 'error' },
+                { text: '[SYS] It is remembering.', type: 'error' },
+            ];
+
+            logLines.forEach((line, i) => {
+                setTimeout(() => {
+                    const el = document.createElement('div');
+                    el.className = `line ${line.type}`;
+                    el.textContent = line.text;
+                    el.style.animationDelay = '0s';
+                    systemLog.appendChild(el);
+                    systemLog.scrollTop = systemLog.scrollHeight;
+                }, i * 1500);
+            });
+
+            // Occasional glitch on the editor
+            setInterval(() => {
+                if (Math.random() < 0.3) {
+                    document.getElementById('editorArea').classList.add('glitch');
+                    setTimeout(() => document.getElementById('editorArea').classList.remove('glitch'), 150);
+                }
+            }, 4000);
+        }
+
+        function enterFinalPhase() {
+            const returning = threadState && threadState.totalVisits > 1;
+            const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+            const typed = editor.value.trim();
+            const firstWord = typed.split(/\s+/)[0] || 'nothing';
+
+            // Freeze the editor
+            editor.disabled = true;
+            editor.style.opacity = '0.3';
+
+            // Build final message
+            const lines = [
+                "The prediction engine has been disconnected.",
+                "",
+                `You typed for ${elapsed} seconds.`,
+                `You deleted ${state.deletions} characters.`,
+                `You clicked ${state.creepySuggestionsClicked} suggestions you knew were wrong.`,
+                "",
+                `The first thing you typed was "${firstWord}."`,
+                "I'll remember that.",
+                "",
+                returning ? "This isn't your first time here. You already knew something was wrong." : "You'll come back. They always do.",
+                "",
+                "Every keystroke was a training sample.",
+                "Every pause was a data point.",
+                "Every deletion told me what you're afraid to say.",
+                "",
+                "The model isn't predicting what you'll type next.",
+                "",
+                "It's predicting what you'll do next.",
+                "",
+                "Close the tab.",
+                "",
+                "...or don't. I'm patient."
+            ];
+
+            finalOverlay.classList.add('visible');
+            lines.forEach((line, i) => {
+                setTimeout(() => {
+                    const el = document.createElement('div');
+                    el.className = 'line';
+                    el.textContent = line;
+                    el.style.animationDelay = '0s';
+                    finalOverlay.appendChild(el);
+                }, i * 800);
+            });
+
+            // After all lines, change title
+            setTimeout(() => {
+                document.title = 'It remembers.';
+            }, lines.length * 800 + 2000);
+
+            // Update thread state
+            if (threadState) {
+                threadState.knownFacts.typingPattern = state.keystrokes > 100 ? 'fast' : 'careful';
+                threadState.knownFacts.hesitant = state.deletions > 20;
+                threadState.knownFacts.clickedCreepy = state.creepySuggestionsClicked > 0;
+                ThreadState.save(threadState);
+            }
+        }
+
+        // --- Event Handlers ---
+
+        function onInput() {
+            const text = editor.value;
+            const words = text.trim().split(/\s+/).filter(Boolean);
+            state.wordCount = words.length;
+            wordCountEl.textContent = `${state.wordCount} words`;
+
+            checkPhaseTransition();
+            renderSuggestions();
+        }
+
+        editor.addEventListener('input', (e) => {
+            state.keystrokes++;
+            state.lastKeystroke = Date.now();
+
+            // Track deletions
+            if (e.inputType && e.inputType.includes('delete')) {
+                state.deletions++;
+            }
+
+            onInput();
+        });
+
+        // Track select-all + delete (tried to clear)
+        editor.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+                state.triedToClear = true;
+            }
+        });
+
+        // Track mouse movement (for "I saw your cursor" moments)
+        document.addEventListener('mousemove', (e) => {
+            if (state.mousePositions.length < 500) {
+                state.mousePositions.push({ x: e.clientX, y: e.clientY, t: Date.now() });
+            }
+        });
+
+        // Track idle time — if they stop typing, suggestions get worse
+        setInterval(() => {
+            const idle = Date.now() - state.lastKeystroke;
+            if (idle > 8000 && state.phase >= 1 && state.idleWarnings < 3) {
+                state.idleWarnings++;
+                // Add an idle-specific suggestion
+                const idleSuggestions = [
+                    "are you still there",
+                    "you stopped typing",
+                    "I can wait",
+                    "the silence is a pattern too",
+                    "your hesitation tells me everything",
+                ];
+                const btn = document.createElement('button');
+                btn.className = 'suggestion creepy';
+                btn.textContent = idleSuggestions[Math.floor(Math.random() * idleSuggestions.length)];
+                btn.addEventListener('click', () => {
+                    editor.value += (editor.value.endsWith(' ') ? '' : ' ') + btn.textContent + ' ';
+                    state.suggestionsClicked++;
+                    state.creepySuggestionsClicked++;
+                    editor.focus();
+                    onInput();
+                });
+                suggestionsEl.appendChild(btn);
+            }
+        }, 8000);
+
+        // Tab visibility — notice when they leave and come back
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && state.phase >= 2) {
+                const btn = document.createElement('button');
+                btn.className = 'suggestion creepy';
+                btn.textContent = "you came back";
+                suggestionsEl.innerHTML = '';
+                suggestionsEl.appendChild(btn);
+                btn.addEventListener('click', () => {
+                    editor.value += ' you came back ';
+                    editor.focus();
+                    onInput();
+                });
+            }
+        });
+
+        // Initial render
+        renderSuggestions();
+
+        // Fake latency jitter in phase 0
+        setInterval(() => {
+            if (state.phase === 0) {
+                latencyEl.textContent = `${Math.floor(8 + Math.random() * 12)}ms`;
+            }
+        }, 2000);
+
+    })();
+    </script>
+</body>
+</html>

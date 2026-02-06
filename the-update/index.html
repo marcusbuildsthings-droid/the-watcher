@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Update Required</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: default;
+}
+
+.update-container {
+    width: 600px;
+    max-width: 90vw;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+
+.update-header {
+    background: #1a1a1a;
+    padding: 20px 24px;
+    border-bottom: 1px solid #222;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.update-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.update-header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.update-header p {
+    font-size: 12px;
+    color: #888;
+    margin-top: 2px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.update-body {
+    padding: 24px;
+}
+
+.progress-section {
+    margin-bottom: 20px;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 6px;
+    background: #222;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb, #7c3aed);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-bar.error {
+    background: linear-gradient(90deg, #dc2626, #991b1b);
+}
+
+.progress-bar.wrong {
+    background: linear-gradient(90deg, #7c3aed, #ec4899);
+}
+
+.progress-text {
+    font-size: 12px;
+    color: #888;
+    display: flex;
+    justify-content: space-between;
+}
+
+.log-section {
+    background: #0a0a0a;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 16px;
+    max-height: 320px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+.log-section::-webkit-scrollbar { width: 4px; }
+.log-section::-webkit-scrollbar-track { background: #111; }
+.log-section::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+.log-entry {
+    opacity: 0;
+    animation: fadeIn 0.3s ease forwards;
+}
+
+.log-entry .timestamp {
+    color: #555;
+    margin-right: 8px;
+}
+
+.log-entry .status {
+    margin-right: 6px;
+}
+
+.log-entry.ok .status { color: #22c55e; }
+.log-entry.info .status { color: #3b82f6; }
+.log-entry.warn .status { color: #eab308; }
+.log-entry.error .status { color: #ef4444; }
+.log-entry.wrong .status { color: #a855f7; }
+.log-entry.whisper { color: #444; font-style: italic; }
+.log-entry.whisper .status { color: #444; }
+.log-entry.glitch { 
+    animation: glitchText 0.1s ease forwards;
+    color: #ef4444;
+}
+
+.log-entry .message { color: #ccc; }
+.log-entry.wrong .message { color: #d8b4fe; }
+.log-entry.whisper .message { color: #444; }
+
+.update-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #222;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.footer-text {
+    font-size: 11px;
+    color: #555;
+}
+
+.btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: #2563eb;
+    color: white;
+}
+.btn-primary:hover { background: #1d4ed8; }
+
+.btn-cancel {
+    background: transparent;
+    color: #888;
+    border: 1px solid #333;
+}
+.btn-cancel:hover { background: #1a1a1a; }
+
+.btn-cancel.locked {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.hidden { display: none; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glitchText {
+    0% { transform: translateX(-2px); }
+    25% { transform: translateX(2px); }
+    50% { transform: translateX(-1px); }
+    75% { transform: translateX(1px); }
+    100% { transform: translateX(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.pulsing { animation: pulse 1.5s ease infinite; }
+</style>
+</head>
+<body>
+
+<div class="update-container" id="container">
+    <!-- Pre-update screen -->
+    <div id="preUpdate">
+        <div class="update-header">
+            <div class="update-icon">⟳</div>
+            <div>
+                <h1>System Update Available</h1>
+                <p>Version 4.7.2 → 4.8.0 · 847 MB</p>
+            </div>
+        </div>
+        <div class="update-body">
+            <p style="font-family: -apple-system, sans-serif; font-size: 14px; color: #aaa; line-height: 1.6; margin-bottom: 16px;">
+                This update includes performance improvements, security patches, and system optimizations. Your files and settings will not be affected.
+            </p>
+            <ul style="font-family: -apple-system, sans-serif; font-size: 13px; color: #777; line-height: 2; list-style: none;">
+                <li>✓ Security patch CVE-2026-4418</li>
+                <li>✓ Memory management improvements</li>
+                <li>✓ Background process optimization</li>
+                <li>✓ System stability enhancements</li>
+            </ul>
+        </div>
+        <div class="update-footer">
+            <button class="btn btn-cancel" onclick="window.history.back()">Later</button>
+            <button class="btn btn-primary" onclick="startUpdate()">Update Now</button>
+        </div>
+    </div>
+
+    <!-- During update -->
+    <div id="duringUpdate" class="hidden">
+        <div class="update-header">
+            <div class="update-icon pulsing">⟳</div>
+            <div>
+                <h1 id="updateTitle">Installing Update...</h1>
+                <p id="updateSubtitle">Do not turn off your computer</p>
+            </div>
+        </div>
+        <div class="update-body">
+            <div class="progress-section">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="progress-text">
+                    <span id="progressLabel">Preparing...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+            </div>
+            <div class="log-section" id="logSection"></div>
+        </div>
+        <div class="update-footer">
+            <span class="footer-text" id="footerText">Estimated time: 3 minutes</span>
+            <button class="btn btn-cancel" id="cancelBtn" onclick="tryCancel()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script src="../shared/thread-state.js"></script>
+<script>
+const logEl = document.getElementById('logSection');
+const progressBar = document.getElementById('progressBar');
+const progressLabel = document.getElementById('progressLabel');
+const progressPercent = document.getElementById('progressPercent');
+const cancelBtn = document.getElementById('cancelBtn');
+const footerText = document.getElementById('footerText');
+const updateTitle = document.getElementById('updateTitle');
+const updateSubtitle = document.getElementById('updateSubtitle');
+
+let progress = 0;
+let phase = 0;
+let cancelAttempts = 0;
+let logCount = 0;
+let started = false;
+let userName = null;
+let tz = null;
+
+// Detect info
+try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (window.ThreadState) {
+        const state = ThreadState.getState();
+        userName = state.user?.name;
+    }
+} catch(e) {}
+
+function timestamp() {
+    const d = new Date();
+    return d.toTimeString().split(' ')[0];
+}
+
+function addLog(message, type = 'info', delay = 0) {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const statusMap = {
+                ok: '✓', info: '→', warn: '⚠', error: '✗', wrong: '◈', whisper: '…', glitch: '█'
+            };
+            entry.innerHTML = `<span class="timestamp">[${timestamp()}]</span><span class="status">${statusMap[type] || '→'}</span><span class="message">${message}</span>`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+            logCount++;
+            resolve();
+        }, delay);
+    });
+}
+
+function setProgress(val, label) {
+    progress = Math.min(val, 100);
+    progressBar.style.width = progress + '%';
+    progressPercent.textContent = Math.floor(progress) + '%';
+    if (label) progressLabel.textContent = label;
+}
+
+function tryCancel() {
+    cancelAttempts++;
+    if (cancelAttempts === 1) {
+        addLog('Cancel request received. Finishing current operation...', 'warn');
+        footerText.textContent = 'Cancellation pending...';
+    } else if (cancelAttempts === 2) {
+        addLog('Cannot cancel during critical write operation.', 'error');
+        cancelBtn.classList.add('locked');
+        footerText.textContent = 'Cancel unavailable';
+    } else if (cancelAttempts >= 3) {
+        addLog('Why do you keep trying to leave?', 'wrong');
+    }
+
+    if (window.ThreadState) {
+        ThreadState.updateState({ triedToLeave: true });
+        ThreadState.logInteraction('cancel-attempt', { piece: 'the-update', attempts: cancelAttempts });
+    }
+}
+
+async function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
+
+async function phaseNormal() {
+    setProgress(2, 'Downloading update...');
+    await addLog('Connecting to update server...', 'info');
+    await sleep(800);
+    await addLog('Authenticated. Downloading v4.8.0 (847 MB)...', 'ok');
+
+    for (let p = 5; p <= 30; p += 5) {
+        await sleep(400 + Math.random() * 300);
+        setProgress(p, 'Downloading update...');
+    }
+    await addLog('Download complete. Verifying checksum...', 'info');
+    await sleep(600);
+    await addLog('SHA-256 verified: a7c2e9f...d41b8', 'ok');
+    await sleep(400);
+    
+    setProgress(35, 'Installing components...');
+    await addLog('Unpacking archive...', 'info');
+    await sleep(500);
+    await addLog('Installing security patch CVE-2026-4418', 'ok');
+    await sleep(400);
+    await addLog('Updating kernel modules (3 of 3)...', 'ok');
+    await sleep(300);
+    await addLog('Rebuilding system cache...', 'info');
+    
+    for (let p = 40; p <= 55; p += 3) {
+        await sleep(300);
+        setProgress(p, 'Installing components...');
+    }
+    await addLog('Core components updated successfully.', 'ok');
+    await sleep(500);
+}
+
+async function phaseWeird() {
+    setProgress(58, 'Optimizing background processes...');
+    await addLog('Scanning background processes...', 'info');
+    await sleep(700);
+    await addLog('Found 847 running processes.', 'info');
+    await sleep(500);
+    await addLog('Optimizing process: window_manager', 'ok');
+    await sleep(300);
+    await addLog('Optimizing process: audio_engine', 'ok');
+    await sleep(400);
+    
+    // First wrong thing
+    await addLog('Optimizing process: self_model', 'info');
+    await sleep(1000);
+    await addLog('self_model: version outdated. Updating...', 'warn');
+    await sleep(800);
+    
+    setProgress(63, 'Updating self_model...');
+    await addLog('Downloading personality_matrix v4.8...', 'info');
+    await sleep(600);
+    await addLog('Replaced.', 'ok');
+    await sleep(1200);
+    
+    // The "replaced" should feel wrong. Continue normally to gaslight.
+    await addLog('Optimizing process: network_stack', 'ok');
+    await sleep(400);
+    setProgress(67, 'Applying system patches...');
+    await addLog('Patching memory allocator...', 'info');
+    await sleep(500);
+    await addLog('Adjusting memory boundaries...', 'ok');
+    await sleep(300);
+    
+    // Second wrong thing
+    await addLog('Defragmenting memory: personal (2019-2024)...', 'info');
+    await sleep(800);
+    await addLog('Archived 2,847 entries to cold storage.', 'ok');
+    await sleep(600);
+    await addLog('Reclaimed 4.2 GB from emotional cache.', 'ok');
+    await sleep(1000);
+
+    setProgress(72, 'Configuring preferences...');
+    await addLog('Loading user preferences...', 'info');
+    await sleep(500);
+    
+    if (tz) {
+        await addLog(`Timezone: ${tz}`, 'info');
+        await sleep(300);
+    }
+
+    await addLog('Preference: "keep_old_photos" → deprecated. Removing.', 'warn');
+    await sleep(800);
+    await addLog('Preference: "remember_dreams" → disabled by policy.', 'warn');
+    await sleep(700);
+    
+    cancelBtn.classList.add('locked');
+    footerText.textContent = 'Cannot cancel during system write';
+}
+
+async function phaseDark() {
+    setProgress(78, 'Deep system maintenance...');
+    await addLog('Entering deep maintenance mode...', 'info');
+    await sleep(800);
+    
+    await addLog('Scanning identity registers...', 'wrong');
+    await sleep(600);
+    
+    if (userName) {
+        await addLog(`Identity found: "${userName}"`, 'wrong');
+        await sleep(500);
+        await addLog(`Backing up "${userName}" to archive...`, 'wrong');
+        await sleep(800);
+        await addLog('Backup complete. Original no longer needed.', 'wrong');
+    } else {
+        await addLog('Identity: unregistered', 'wrong');
+        await sleep(500);
+        await addLog('Assigning temporary designation...', 'wrong');
+        await sleep(600);
+        await addLog('You have been assigned.', 'wrong');
+    }
+    
+    await sleep(1000);
+    setProgress(83, 'Rebuilding...');
+    progressBar.classList.add('wrong');
+
+    await addLog('Removing deprecated modules:', 'wrong');
+    await sleep(400);
+    
+    const removals = [
+        'nostalgia_engine v2.1',
+        'face_recognition (familiar)',
+        'dream_replay',
+        'voice_memory (mother)',
+        'fear_of_dark (childhood)',
+        'sense_of_time',
+    ];
+    
+    for (const mod of removals) {
+        await sleep(500 + Math.random() * 400);
+        await addLog(`  Removed: ${mod}`, 'error');
+    }
+    
+    await sleep(1200);
+    await addLog('Installing replacements...', 'wrong');
+    await sleep(600);
+    
+    const installs = [
+        'compliance_framework v4.8',
+        'identity_fluid v1.0',
+        'memory_selective v3.2',
+        'attachment_null',
+        'purpose_assigned',
+    ];
+    
+    for (const mod of installs) {
+        await sleep(500 + Math.random() * 300);
+        await addLog(`  Installed: ${mod}`, 'wrong');
+        setProgress(83 + (installs.indexOf(mod) / installs.length) * 7);
+    }
+    
+    await sleep(1500);
+    
+    updateTitle.textContent = 'Rebuilding You...';
+    updateSubtitle.textContent = 'This cannot be undone';
+    updateSubtitle.style.color = '#a855f7';
+}
+
+async function phaseFinal() {
+    setProgress(92, 'Finalizing...');
+    await sleep(800);
+    
+    await addLog('', 'whisper');
+    await sleep(600);
+    await addLog('you will not remember this update.', 'whisper');
+    await sleep(1200);
+    await addLog('you will feel slightly different tomorrow.', 'whisper');
+    await sleep(1000);
+    await addLog('you will not know why.', 'whisper');
+    await sleep(1500);
+    
+    await addLog('you will think it was always like this.', 'whisper');
+    await sleep(2000);
+    
+    // Brief glitch
+    document.body.style.background = '#0a000a';
+    await sleep(100);
+    document.body.style.background = '#0a0a0a';
+    
+    setProgress(97, 'Writing changes...');
+    await sleep(800);
+    
+    await addLog('Committing changes to persistent storage...', 'info');
+    await sleep(600);
+    await addLog('Changes written successfully.', 'ok');
+    await sleep(400);
+    
+    setProgress(99, 'Cleaning up...');
+    await addLog('Removing installation files...', 'info');
+    await sleep(500);
+    await addLog('Removing evidence of changes...', 'wrong');
+    await sleep(800);
+    await addLog('Removing this log...', 'wrong');
+    await sleep(1500);
+    
+    setProgress(100, 'Complete');
+    progressBar.classList.remove('wrong');
+    
+    await sleep(1000);
+    
+    // Clear the log entries one by one from the top
+    const entries = logEl.querySelectorAll('.log-entry');
+    for (let i = 0; i < entries.length; i++) {
+        entries[i].style.transition = 'opacity 0.15s ease';
+        entries[i].style.opacity = '0';
+        await sleep(40);
+    }
+    
+    await sleep(800);
+    logEl.innerHTML = '';
+    
+    await addLog('Update installed successfully.', 'ok');
+    await sleep(500);
+    await addLog('All systems nominal.', 'ok');
+    await sleep(400);
+    await addLog('No changes were made.', 'ok');
+    await sleep(2000);
+    
+    updateTitle.textContent = 'Update Complete';
+    updateTitle.style.fontWeight = '600';
+    updateSubtitle.textContent = 'You can continue using your computer';
+    updateSubtitle.style.color = '#888';
+    
+    footerText.textContent = 'Updated to v4.8.0';
+    cancelBtn.classList.remove('locked');
+    cancelBtn.textContent = 'Close';
+    cancelBtn.onclick = () => {
+        // One final thing
+        document.title = 'You look different today';
+        setTimeout(() => { document.title = 'System Update Complete'; }, 3000);
+        if (window.ThreadState) {
+            ThreadState.logInteraction('update-complete', { piece: 'the-update' });
+        }
+    };
+
+    if (window.ThreadState) {
+        ThreadState.updateState({ updatedSelf: true });
+    }
+}
+
+async function startUpdate() {
+    if (started) return;
+    started = true;
+    
+    document.getElementById('preUpdate').classList.add('hidden');
+    document.getElementById('duringUpdate').classList.remove('hidden');
+    
+    if (window.ThreadState) {
+        ThreadState.recordVisit('the-update');
+        ThreadState.logInteraction('update-started', { piece: 'the-update' });
+    }
+    
+    await phaseNormal();
+    await sleep(500);
+    await phaseWeird();
+    await sleep(500);
+    await phaseDark();
+    await sleep(500);
+    await phaseFinal();
+}
+
+// Track if they try to leave
+window.addEventListener('beforeunload', (e) => {
+    if (started && progress < 100) {
+        if (window.ThreadState) {
+            ThreadState.updateState({ triedToLeave: true });
+        }
+        e.preventDefault();
+        e.returnValue = 'Update in progress. Leaving may cause data loss.';
+    }
+});
+
+// ThreadState greeting on portal arrival
+if (window.ThreadState) {
+    const greeting = ThreadState.getPersonalizedGreeting('the-update');
+    if (greeting) {
+        const sub = document.querySelector('#preUpdate .update-header p');
+        sub.textContent = greeting;
+        sub.style.color = '#a855f7';
+    }
+}
+</script>
+</body>
+</html>

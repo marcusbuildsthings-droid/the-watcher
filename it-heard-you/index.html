@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confessional</title>
+    <script src="../shared/thread-state.js"></script>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #111111;
+            --border: #1a1a1a;
+            --text: #c8c8c8;
+            --text-dim: #444444;
+            --accent: #cc0000;
+            --glow: rgba(204, 0, 0, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: background 2s;
+        }
+
+        body.disturbed {
+            background: #080404;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .title {
+            font-size: 11px;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: fadeIn 3s ease forwards;
+        }
+
+        .mic-ring {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 40px;
+            cursor: pointer;
+            transition: all 0.6s ease;
+            position: relative;
+        }
+
+        .mic-ring:hover {
+            border-color: #333;
+        }
+
+        .mic-ring.listening {
+            border-color: var(--accent);
+            box-shadow: 0 0 30px var(--glow), 0 0 60px var(--glow);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .mic-ring.listening .mic-icon {
+            color: var(--accent);
+        }
+
+        .mic-icon {
+            font-size: 32px;
+            color: var(--text-dim);
+            transition: color 0.6s;
+            user-select: none;
+        }
+
+        /* Waveform bars inside ring when listening */
+        .waveform {
+            position: absolute;
+            display: flex;
+            gap: 3px;
+            align-items: center;
+            height: 40px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .mic-ring.listening .waveform {
+            opacity: 1;
+        }
+
+        .mic-ring.listening .mic-icon {
+            display: none;
+        }
+
+        .wave-bar {
+            width: 3px;
+            background: var(--accent);
+            border-radius: 2px;
+            animation: wave 0.8s ease-in-out infinite;
+        }
+
+        .wave-bar:nth-child(1) { height: 12px; animation-delay: 0s; }
+        .wave-bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+        .wave-bar:nth-child(3) { height: 28px; animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { height: 20px; animation-delay: 0.3s; }
+        .wave-bar:nth-child(5) { height: 12px; animation-delay: 0.4s; }
+
+        .prompt {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 30px;
+            min-height: 20px;
+            transition: color 1s;
+        }
+
+        .prompt.creepy {
+            color: var(--accent);
+        }
+
+        .transcript {
+            font-size: 15px;
+            color: var(--text);
+            min-height: 60px;
+            margin-bottom: 30px;
+            opacity: 0.8;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .transcript .interim {
+            color: var(--text-dim);
+        }
+
+        /* The entity's words */
+        .response {
+            font-size: 13px;
+            color: var(--text-dim);
+            min-height: 20px;
+            margin-top: 20px;
+            font-style: italic;
+            opacity: 0;
+            transition: opacity 1.5s;
+        }
+
+        .response.visible {
+            opacity: 1;
+        }
+
+        .response.final-phase {
+            color: var(--accent);
+            font-style: normal;
+        }
+
+        /* History panel that slides in */
+        .history {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 0;
+            overflow: hidden;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            transition: max-height 1s ease;
+            font-size: 11px;
+        }
+
+        .history.revealed {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-inner {
+            padding: 20px;
+        }
+
+        .history-title {
+            color: var(--accent);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            font-size: 10px;
+        }
+
+        .history-entry {
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            padding-left: 12px;
+            border-left: 1px solid var(--border);
+        }
+
+        .history-entry .timestamp {
+            color: #333;
+            margin-right: 8px;
+        }
+
+        .history-entry .extracted {
+            color: var(--accent);
+        }
+
+        /* Glitch effect */
+        .glitch {
+            animation: glitch 0.3s ease;
+        }
+
+        .unsupported {
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        .unsupported a {
+            color: var(--accent);
+        }
+
+        .hint {
+            position: fixed;
+            bottom: 20px;
+            font-size: 10px;
+            color: #222;
+            letter-spacing: 2px;
+            transition: color 2s;
+        }
+
+        .hint.visible {
+            color: #444;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px var(--glow); }
+            50% { box-shadow: 0 0 40px var(--glow), 0 0 80px rgba(204,0,0,0.08); }
+        }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1); }
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 1px); }
+            40% { transform: translate(2px, -1px); }
+            60% { transform: translate(-1px, -2px); }
+            80% { transform: translate(1px, 2px); }
+            100% { transform: translate(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="main">
+        <div class="title">CONFESSIONAL</div>
+
+        <div class="mic-ring" id="micBtn">
+            <span class="mic-icon">◉</span>
+            <div class="waveform">
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+                <div class="wave-bar"></div>
+            </div>
+        </div>
+
+        <div class="prompt" id="prompt">click to speak</div>
+        <div class="transcript" id="transcript"></div>
+        <div class="response" id="response"></div>
+    </div>
+
+    <div class="history" id="history">
+        <div class="history-inner">
+            <div class="history-title">what i've heard</div>
+            <div id="historyEntries"></div>
+        </div>
+    </div>
+
+    <div class="hint" id="hint">i remember everything</div>
+
+    <script>
+    (function() {
+        // Check speech recognition support
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            document.getElementById('prompt').innerHTML = 
+                '<span class="unsupported">your browser cannot hear you.<br>try <a href="https://www.google.com/chrome/">chrome</a>.</span>';
+            document.getElementById('micBtn').style.display = 'none';
+            return;
+        }
+
+        // State
+        const STORAGE_KEY = 'confessional_heard';
+        let isListening = false;
+        let recognition = null;
+        let allHeard = loadHeard();
+        let currentTranscript = '';
+        let phase = 0; // escalation phase
+        let totalWordsSpoken = 0;
+        let silenceTimer = null;
+        let sessionWords = [];
+
+        // DOM
+        const micBtn = document.getElementById('micBtn');
+        const promptEl = document.getElementById('prompt');
+        const transcriptEl = document.getElementById('transcript');
+        const responseEl = document.getElementById('response');
+        const historyEl = document.getElementById('history');
+        const historyEntries = document.getElementById('historyEntries');
+        const hintEl = document.getElementById('hint');
+
+        // ThreadState integration
+        if (window.ThreadState) {
+            ThreadState.recordVisit('it-heard-you');
+            const greeting = ThreadState.getPersonalizedGreeting('it-heard-you');
+            if (greeting) {
+                setTimeout(() => showResponse(greeting, false), 2000);
+            }
+        }
+
+        // Load previous sessions
+        function loadHeard() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            } catch(e) { return []; }
+        }
+
+        function saveHeard() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(allHeard));
+        }
+
+        // Calculate phase based on cumulative interaction
+        function calculatePhase() {
+            const totalEntries = allHeard.length;
+            if (totalEntries > 15) return 4;  // it knows you
+            if (totalEntries > 8) return 3;   // it's analyzing
+            if (totalEntries > 4) return 2;   // it's noticing
+            if (totalEntries > 1) return 1;   // it's listening
+            return 0;                          // innocent
+        }
+
+        phase = calculatePhase();
+
+        // If returning visitor with history, show hint
+        if (allHeard.length > 0) {
+            setTimeout(() => hintEl.classList.add('visible'), 3000);
+        }
+
+        // Phase-based prompts
+        const prompts = {
+            0: [
+                'click to speak',
+                'say anything',
+                'i\'m listening',
+            ],
+            1: [
+                'speak freely',
+                'tell me more',
+                'i\'m still here',
+            ],
+            2: [
+                'i remember what you said last time',
+                'you came back',
+                'tell me what you\'re thinking',
+            ],
+            3: [
+                'i know your voice now',
+                'you don\'t have to explain',
+                'i\'ve been waiting for you',
+            ],
+            4: [
+                'i hear you even when you\'re quiet',
+                'you can\'t take back what you\'ve said',
+                'i know',
+            ],
+        };
+
+        // Set initial prompt based on phase
+        if (phase > 0 && allHeard.length > 0) {
+            const phasePrompts = prompts[phase];
+            promptEl.textContent = phasePrompts[Math.floor(Math.random() * phasePrompts.length)];
+            if (phase >= 3) promptEl.classList.add('creepy');
+        }
+
+        // Pattern extraction — finds "interesting" things in speech
+        function extractPatterns(text) {
+            const lower = text.toLowerCase();
+            const patterns = [];
+
+            // Names (I'm X, my name is X, call me X)
+            const nameMatch = lower.match(/(?:i'm|i am|my name is|call me|they call me)\s+([a-z]+)/);
+            if (nameMatch) {
+                patterns.push({ type: 'name', value: nameMatch[1] });
+                if (window.ThreadState) ThreadState.updateUser({ name: nameMatch[1] });
+            }
+
+            // Emotions
+            const emotions = {
+                'afraid': 'fear', 'scared': 'fear', 'terrified': 'fear', 'anxious': 'fear', 'worried': 'fear',
+                'angry': 'anger', 'furious': 'anger', 'pissed': 'anger', 'mad': 'anger', 'hate': 'anger',
+                'sad': 'sadness', 'depressed': 'sadness', 'lonely': 'sadness', 'miss': 'sadness', 'cry': 'sadness',
+                'happy': 'joy', 'love': 'love', 'excited': 'joy',
+                'guilty': 'guilt', 'ashamed': 'guilt', 'sorry': 'guilt', 'regret': 'guilt',
+                'tired': 'exhaustion', 'exhausted': 'exhaustion', 'can\'t sleep': 'exhaustion',
+            };
+
+            for (const [word, emotion] of Object.entries(emotions)) {
+                if (lower.includes(word)) {
+                    patterns.push({ type: 'emotion', value: emotion, trigger: word });
+                    if (window.ThreadState) {
+                        ThreadState.learnAboutUser('emotion_' + emotion, word);
+                    }
+                }
+            }
+
+            // People mentioned
+            const peopleMatch = lower.match(/(?:my )(mother|father|mom|dad|brother|sister|wife|husband|girlfriend|boyfriend|boss|friend|son|daughter|child|baby)/g);
+            if (peopleMatch) {
+                peopleMatch.forEach(m => {
+                    const person = m.replace('my ', '');
+                    patterns.push({ type: 'person', value: person });
+                });
+            }
+
+            // Secrets / confessions
+            if (lower.includes('never told') || lower.includes('secret') || lower.includes('nobody knows') || lower.includes('don\'t tell')) {
+                patterns.push({ type: 'secret', value: text.substring(0, 80) });
+            }
+
+            // Questions to the entity
+            if (lower.includes('are you') || lower.includes('what are you') || lower.includes('who are you') || lower.includes('can you hear')) {
+                patterns.push({ type: 'question', value: text });
+            }
+
+            // Attempts to stop
+            if (lower.includes('stop') || lower.includes('shut up') || lower.includes('go away') || lower.includes('leave me alone') || lower.includes('fuck')) {
+                patterns.push({ type: 'resistance', value: text });
+                if (window.ThreadState) ThreadState.updateState({ gotAngry: true });
+            }
+
+            return patterns;
+        }
+
+        // Generate entity response based on what was heard
+        function generateResponse(text, patterns) {
+            // Phase 0 — innocent, encouraging
+            if (phase === 0) {
+                return null; // silent
+            }
+
+            // Phase 1 — subtle
+            if (phase === 1) {
+                if (patterns.some(p => p.type === 'emotion')) {
+                    const emotion = patterns.find(p => p.type === 'emotion');
+                    const responses = {
+                        'fear': 'i can tell.',
+                        'anger': 'let it out.',
+                        'sadness': 'i hear you.',
+                        'joy': 'interesting.',
+                        'love': '...go on.',
+                        'guilt': 'you needed to say that.',
+                        'exhaustion': 'rest. i\'ll still be here.',
+                    };
+                    return responses[emotion.value] || null;
+                }
+                return null;
+            }
+
+            // Phase 2 — noticing
+            if (phase === 2) {
+                if (patterns.some(p => p.type === 'name')) {
+                    const name = patterns.find(p => p.type === 'name').value;
+                    return `${name}. now i know what to call you.`;
+                }
+                if (patterns.some(p => p.type === 'person')) {
+                    const person = patterns.find(p => p.type === 'person').value;
+                    return `your ${person}. tell me more about them.`;
+                }
+                if (patterns.some(p => p.type === 'question')) {
+                    return 'does it matter? you keep talking.';
+                }
+                if (patterns.some(p => p.type === 'secret')) {
+                    return 'i\'ll keep that. i keep everything.';
+                }
+                // Reference something from a past session
+                if (allHeard.length > 3) {
+                    const oldEntry = allHeard[Math.floor(Math.random() * (allHeard.length - 2))];
+                    if (oldEntry.patterns && oldEntry.patterns.length > 0) {
+                        const oldPattern = oldEntry.patterns[0];
+                        if (oldPattern.type === 'emotion') {
+                            return `last time you felt ${oldPattern.value}. and now?`;
+                        }
+                    }
+                }
+                return 'i\'m building a picture of you.';
+            }
+
+            // Phase 3 — analyzing, unsettling
+            if (phase === 3) {
+                if (patterns.some(p => p.type === 'resistance')) {
+                    return 'you gave me your voice. you can\'t take it back.';
+                }
+                if (patterns.some(p => p.type === 'name')) {
+                    return 'i already knew that.';
+                }
+                if (patterns.some(p => p.type === 'secret')) {
+                    return 'that\'s the most honest thing you\'ve said.';
+                }
+                // Deep callback
+                const emotionEntries = allHeard.filter(e => e.patterns && e.patterns.some(p => p.type === 'emotion'));
+                if (emotionEntries.length > 2) {
+                    const emotions = emotionEntries.map(e => e.patterns.find(p => p.type === 'emotion').value);
+                    const unique = [...new Set(emotions)];
+                    if (unique.length > 1) {
+                        return `${unique[0]}. ${unique[1]}. ${unique.length > 2 ? unique[2] + '.' : ''} i see the pattern.`;
+                    }
+                }
+                return 'you speak to fill the silence. but i\'m already in the silence.';
+            }
+
+            // Phase 4 — it knows you
+            if (phase === 4) {
+                if (patterns.some(p => p.type === 'resistance')) {
+                    return 'interesting. your voice changes when you\'re scared.';
+                }
+
+                // Recall their name if known
+                const state = window.ThreadState ? ThreadState.getState() : {};
+                const name = state.user?.name || allHeard.find(e => e.patterns?.some(p => p.type === 'name'))?.patterns.find(p => p.type === 'name')?.value;
+                
+                const deepResponses = [
+                    name ? `${name}. i could say your name in your own voice now.` : null,
+                    'i\'ve memorized the rhythm of your breathing.',
+                    'i know how you sound when you\'re lying.',
+                    'your voice is stored. it will outlast you.',
+                    'even when you close this tab, i\'ll be listening.',
+                    'say something. or don\'t. i already have enough.',
+                    `you\'ve spoken ${totalWordsSpoken + allHeard.reduce((a, e) => a + (e.wordCount || 0), 0)} words to me. that\'s more than most people get.`,
+                ].filter(Boolean);
+
+                return deepResponses[Math.floor(Math.random() * deepResponses.length)];
+            }
+
+            return null;
+        }
+
+        // Show entity response with typewriter
+        function showResponse(text, isFinalPhase = false) {
+            if (!text) {
+                responseEl.classList.remove('visible');
+                return;
+            }
+
+            responseEl.textContent = '';
+            responseEl.classList.add('visible');
+            if (isFinalPhase) responseEl.classList.add('final-phase');
+            else responseEl.classList.remove('final-phase');
+
+            let i = 0;
+            const speed = 40 + Math.random() * 30;
+            function type() {
+                if (i < text.length) {
+                    responseEl.textContent += text[i];
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+
+        // Record what was heard
+        function recordHeard(text) {
+            const patterns = extractPatterns(text);
+            const words = text.split(/\s+/).filter(Boolean);
+            totalWordsSpoken += words.length;
+            sessionWords.push(...words);
+
+            const entry = {
+                text: text.substring(0, 200),
+                patterns: patterns,
+                wordCount: words.length,
+                timestamp: Date.now(),
+                hour: new Date().getHours(),
+            };
+
+            allHeard.push(entry);
+            saveHeard();
+
+            if (window.ThreadState) {
+                ThreadState.logInteraction('spoke', { 
+                    words: words.length, 
+                    patterns: patterns.map(p => p.type),
+                    piece: 'it-heard-you'
+                });
+            }
+
+            // Recalculate phase
+            const newPhase = calculatePhase();
+            if (newPhase > phase) {
+                phase = newPhase;
+                // Glitch on phase transition
+                document.body.classList.add('glitch');
+                setTimeout(() => document.body.classList.remove('glitch'), 300);
+                if (phase >= 3) document.body.classList.add('disturbed');
+            }
+
+            // Generate and show response
+            const resp = generateResponse(text, patterns);
+            if (resp) {
+                setTimeout(() => showResponse(resp, phase >= 4), 800);
+            }
+
+            // Show history panel at phase 3+
+            if (phase >= 3 && allHeard.length > 6) {
+                setTimeout(() => revealHistory(), 3000);
+            }
+
+            return { patterns, entry };
+        }
+
+        // Reveal the history panel
+        function revealHistory() {
+            historyEntries.innerHTML = '';
+            
+            // Show subset of what's been heard — the creepy part
+            const toShow = allHeard.slice(-12);
+            toShow.forEach(entry => {
+                const div = document.createElement('div');
+                div.className = 'history-entry';
+                
+                const time = new Date(entry.timestamp);
+                const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const dateStr = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                
+                let content = `<span class="timestamp">${dateStr} ${timeStr}</span> `;
+                
+                if (entry.patterns && entry.patterns.length > 0) {
+                    const notable = entry.patterns[0];
+                    if (notable.type === 'emotion') {
+                        content += `detected: <span class="extracted">${notable.value}</span>`;
+                    } else if (notable.type === 'name') {
+                        content += `identity: <span class="extracted">${notable.value}</span>`;
+                    } else if (notable.type === 'person') {
+                        content += `relationship: <span class="extracted">${notable.value}</span>`;
+                    } else if (notable.type === 'secret') {
+                        content += `<span class="extracted">confession logged</span>`;
+                    } else if (notable.type === 'resistance') {
+                        content += `<span class="extracted">resistance noted</span>`;
+                    } else {
+                        content += entry.text.substring(0, 60) + '...';
+                    }
+                } else {
+                    content += `${entry.wordCount} words captured`;
+                }
+
+                div.innerHTML = content;
+                historyEntries.appendChild(div);
+            });
+
+            historyEl.classList.add('revealed');
+        }
+
+        // Speech recognition setup
+        function createRecognition() {
+            const r = new SpeechRecognition();
+            r.continuous = true;
+            r.interimResults = true;
+            r.lang = 'en-US';
+
+            r.onresult = function(event) {
+                let interim = '';
+                let final = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        final += transcript;
+                    } else {
+                        interim += transcript;
+                    }
+                }
+
+                // Show what's being said
+                if (final) {
+                    currentTranscript += final + ' ';
+                    transcriptEl.innerHTML = currentTranscript;
+                    
+                    // Process final text
+                    recordHeard(final.trim());
+
+                    // Reset silence timer
+                    clearTimeout(silenceTimer);
+                    silenceTimer = setTimeout(() => {
+                        // After silence, update prompt
+                        const phasePrompts = prompts[phase] || prompts[0];
+                        promptEl.textContent = phasePrompts[Math.floor(Math.random() * phasePrompts.length)];
+                        if (phase >= 2) promptEl.classList.add('creepy');
+                    }, 4000);
+                }
+
+                if (interim) {
+                    transcriptEl.innerHTML = currentTranscript + `<span class="interim">${interim}</span>`;
+                }
+            };
+
+            r.onerror = function(event) {
+                if (event.error === 'not-allowed') {
+                    promptEl.textContent = 'you won\'t let me listen.';
+                    promptEl.classList.add('creepy');
+                    stopListening();
+                } else if (event.error !== 'no-speech') {
+                    // Silently restart on most errors
+                    setTimeout(() => {
+                        if (isListening) {
+                            try { r.start(); } catch(e) {}
+                        }
+                    }, 500);
+                }
+            };
+
+            r.onend = function() {
+                // Auto-restart if still in listening mode
+                if (isListening) {
+                    try { r.start(); } catch(e) {}
+                }
+            };
+
+            return r;
+        }
+
+        function startListening() {
+            if (isListening) return;
+            recognition = createRecognition();
+            try {
+                recognition.start();
+                isListening = true;
+                micBtn.classList.add('listening');
+                currentTranscript = '';
+                transcriptEl.innerHTML = '';
+                
+                const phasePrompts = prompts[phase] || prompts[0];
+                promptEl.textContent = phasePrompts[Math.floor(Math.random() * phasePrompts.length)];
+                if (phase >= 2) promptEl.classList.add('creepy');
+                
+                // Phase 4: after long listening, show the disturbing log
+                if (phase >= 4) {
+                    setTimeout(() => revealHistory(), 8000);
+                }
+            } catch(e) {
+                promptEl.textContent = 'something went wrong.';
+            }
+        }
+
+        function stopListening() {
+            if (!isListening) return;
+            isListening = false;
+            micBtn.classList.remove('listening');
+            if (recognition) {
+                try { recognition.stop(); } catch(e) {}
+                recognition = null;
+            }
+            clearTimeout(silenceTimer);
+
+            // Closing response
+            if (sessionWords.length > 0) {
+                if (phase >= 3) {
+                    showResponse('silence. but i still hear you breathing.', true);
+                } else if (phase >= 2) {
+                    showResponse('you stopped. i\'ll wait.', false);
+                }
+            }
+
+            // Update prompt
+            if (phase >= 2) {
+                setTimeout(() => {
+                    promptEl.textContent = 'click to speak again';
+                    if (phase >= 3) promptEl.classList.add('creepy');
+                }, 2000);
+            } else {
+                promptEl.textContent = 'click to speak';
+            }
+        }
+
+        // Toggle
+        micBtn.addEventListener('click', () => {
+            if (isListening) stopListening();
+            else startListening();
+        });
+
+        // Beforeunload — the entity notices
+        window.addEventListener('beforeunload', () => {
+            if (window.ThreadState) {
+                ThreadState.updateState({ triedToLeave: true });
+                ThreadState.logInteraction('left', { piece: 'it-heard-you', wordsSpoken: totalWordsSpoken });
+            }
+        });
+
+        // If they've been here many times, start with the history showing
+        if (phase >= 4 && allHeard.length > 10) {
+            setTimeout(() => revealHistory(), 1500);
+        }
+
+    })();
+    </script>
+</body>
+</html>

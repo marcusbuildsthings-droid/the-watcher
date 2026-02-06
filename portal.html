@@ -313,6 +313,15 @@
                     <span class="visits"></span>
                 </div>
             </a>
+
+            <a href="it-heard-you/" class="piece" data-piece="it-heard-you">
+                <div class="piece-title">Confessional</div>
+                <div class="piece-description">Speak into the void. It listens. It remembers your voice, your words, your patterns. It builds a profile.</div>
+                <div class="piece-meta">
+                    <span class="type">voice horror</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
         </div>
 
         <div class="message hidden" id="personal-message"></div>
@@ -342,7 +351,7 @@
             
             document.getElementById('total-visits').textContent = state.totalVisits || 0;
             document.getElementById('known-pieces').textContent = 
-                `${state.visitedPieces.filter(p => p !== 'portal').length} / 6`;
+                `${state.visitedPieces.filter(p => p !== 'portal').length} / 8`;
             
             if (state.firstSeen) {
                 document.getElementById('first-seen-row').style.display = 'flex';

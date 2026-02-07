@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Mirror Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #050505;
+            color: #888;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        .custom-cursor {
+            position: fixed;
+            width: 12px;
+            height: 12px;
+            border: 1px solid #555;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transition: transform 0.1s;
+            mix-blend-mode: difference;
+        }
+
+        .custom-cursor.watching {
+            border-color: #a33;
+            box-shadow: 0 0 8px rgba(170,50,50,0.4);
+            transform: scale(1.5);
+        }
+
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            position: relative;
+        }
+
+        .phase { display: none; }
+        .phase.active { display: block; }
+
+        h1 {
+            color: #666;
+            font-size: 1.4em;
+            margin-bottom: 40px;
+            font-weight: normal;
+            letter-spacing: 2px;
+        }
+
+        .prompt {
+            font-size: 1.1em;
+            line-height: 1.8;
+            margin-bottom: 30px;
+            opacity: 0;
+            animation: fadeIn 3s forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .input-area {
+            margin: 30px 0;
+        }
+
+        .input-area input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #333;
+            color: #aaa;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            padding: 8px 0;
+            width: 100%;
+            outline: none;
+            caret-color: #a33;
+        }
+
+        .input-area input::placeholder {
+            color: #333;
+        }
+
+        .observation {
+            color: #555;
+            font-size: 0.85em;
+            margin: 15px 0;
+            opacity: 0;
+            transition: opacity 1.5s;
+            line-height: 1.6;
+        }
+
+        .observation.visible { opacity: 1; }
+        .observation.creepy { color: #a33; }
+
+        .reflection-box {
+            border: 1px solid #222;
+            padding: 30px;
+            margin: 40px 0;
+            position: relative;
+            background: #080808;
+        }
+
+        .reflection-box::before {
+            content: 'REFLECTION';
+            position: absolute;
+            top: -10px;
+            left: 15px;
+            background: #080808;
+            padding: 0 8px;
+            font-size: 0.7em;
+            color: #444;
+            letter-spacing: 3px;
+        }
+
+        .reflection-line {
+            margin: 12px 0;
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: opacity 0.8s, transform 0.8s;
+            font-size: 0.95em;
+        }
+
+        .reflection-line.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .reflection-line .label {
+            color: #555;
+        }
+
+        .reflection-line .value {
+            color: #c8c8c8;
+        }
+
+        .reflection-line .value.wrong {
+            color: #a33;
+            text-decoration: line-through;
+            position: relative;
+        }
+
+        .final-message {
+            margin-top: 60px;
+            font-size: 1.1em;
+            line-height: 1.8;
+            opacity: 0;
+            transition: opacity 3s;
+        }
+
+        .final-message.visible { opacity: 1; }
+
+        .heartbeat {
+            display: inline-block;
+            animation: pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .glitch-text {
+            position: relative;
+        }
+
+        .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            left: 2px;
+            top: 0;
+            color: #a33;
+            opacity: 0;
+            clip: rect(0, 900px, 0, 0);
+        }
+
+        .glitch-text.active::after {
+            animation: glitchClip 0.3s steps(2) infinite;
+            opacity: 0.7;
+        }
+
+        @keyframes glitchClip {
+            0% { clip: rect(0, 9999px, 100px, 0); transform: translate(-2px); }
+            50% { clip: rect(50px, 9999px, 200px, 0); transform: translate(2px); }
+            100% { clip: rect(0, 9999px, 100px, 0); transform: translate(0); }
+        }
+
+        .typing-analysis {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.65em;
+            color: #333;
+            text-align: right;
+            transition: color 0.5s;
+            pointer-events: none;
+        }
+
+        .typing-analysis.alert { color: #a33; }
+
+        #mirror-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.03;
+        }
+
+        .thread-link {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            font-size: 0.65em;
+            color: #222;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .thread-link:hover { color: #555; }
+    </style>
+</head>
+<body>
+    <canvas id="mirror-canvas"></canvas>
+    <div class="custom-cursor" id="cursor"></div>
+    
+    <div class="container">
+        <!-- Phase 1: The prompt -->
+        <div class="phase active" id="phase1">
+            <h1>THE MIRROR TEST</h1>
+            <div class="prompt">
+                in psychology, a mirror test determines if a subject<br>
+                recognizes its own reflection.<br><br>
+                most animals fail.<br><br>
+                type your name to begin.
+            </div>
+            <div class="input-area">
+                <input type="text" id="name-input" placeholder="..." autocomplete="off" spellcheck="false">
+            </div>
+            <div class="observation" id="obs-typing"></div>
+            <div class="observation" id="obs-hesitation"></div>
+            <div class="observation" id="obs-speed"></div>
+        </div>
+
+        <!-- Phase 2: Questions -->
+        <div class="phase" id="phase2">
+            <div class="prompt" id="phase2-prompt"></div>
+            <div class="input-area">
+                <input type="text" id="answer-input" placeholder="..." autocomplete="off" spellcheck="false">
+            </div>
+            <div class="observation" id="obs-answer"></div>
+        </div>
+
+        <!-- Phase 3: The reflection -->
+        <div class="phase" id="phase3">
+            <div class="prompt" id="phase3-intro"></div>
+            <div class="reflection-box" id="reflection">
+                <!-- Filled dynamically -->
+            </div>
+            <div class="final-message" id="final"></div>
+        </div>
+    </div>
+
+    <div class="typing-analysis" id="typing-analysis"></div>
+    <a href="../portal.html" class="thread-link">thread://</a>
+
+    <script src="../shared/thread-state.js"></script>
+    <script>
+    (function() {
+        // --- State ---
+        const profile = {
+            name: null,
+            typingSpeed: [],     // ms between keystrokes
+            hesitations: 0,      // pauses > 2s while typing
+            deletions: 0,        // backspace count
+            mousePattern: [],    // movement samples
+            mouseIdle: 0,        // time mouse hasn't moved
+            scrolls: 0,
+            screenW: screen.width,
+            screenH: screen.height,
+            pixelRatio: devicePixelRatio,
+            darkMode: matchMedia('(prefers-color-scheme: dark)').matches,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            language: navigator.language,
+            platform: navigator.platform,
+            hour: new Date().getHours(),
+            touchDevice: 'ontouchstart' in window,
+            answers: {},
+            startTime: Date.now(),
+            tabSwitches: 0,
+            rightClicks: 0,
+        };
+
+        let lastKeyTime = null;
+        let lastMouseMove = Date.now();
+        let currentPhase = 1;
+        let questionIndex = 0;
+        
+        const questions = [
+            { q: "what are you afraid of?", key: "fear" },
+            { q: "what time do you usually go to sleep?", key: "bedtime" },
+            { q: "are you alone right now?", key: "alone" },
+        ];
+
+        // --- Cursor ---
+        const cursor = document.getElementById('cursor');
+        let cursorX = 0, cursorY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            cursorX = e.clientX;
+            cursorY = e.clientY;
+            cursor.style.left = (e.clientX - 6) + 'px';
+            cursor.style.top = (e.clientY - 6) + 'px';
+            
+            profile.mousePattern.push({ x: e.clientX, y: e.clientY, t: Date.now() });
+            if (profile.mousePattern.length > 200) profile.mousePattern.shift();
+            lastMouseMove = Date.now();
+        });
+
+        // Track idle mouse — cursor starts "watching"
+        setInterval(() => {
+            const idle = Date.now() - lastMouseMove;
+            if (idle > 3000) {
+                cursor.classList.add('watching');
+                profile.mouseIdle += 1;
+            } else {
+                cursor.classList.remove('watching');
+            }
+        }, 1000);
+
+        // --- Canvas: mirror mouse trail ---
+        const canvas = document.getElementById('mirror-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        setInterval(() => {
+            ctx.fillStyle = 'rgba(5,5,5,0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Draw mirrored cursor position
+            const mx = canvas.width - cursorX;
+            const my = cursorY;
+            ctx.beginPath();
+            ctx.arc(mx, my, 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(170,50,50,0.3)';
+            ctx.fill();
+        }, 50);
+
+        // --- Tab visibility ---
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) profile.tabSwitches++;
+        });
+
+        // --- Right clicks ---
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            profile.rightClicks++;
+            showObservation('obs-typing', 'you tried to inspect something.', true);
+        });
+
+        // --- Phase 1: Name input ---
+        const nameInput = document.getElementById('name-input');
+        const typingAnalysis = document.getElementById('typing-analysis');
+        let nameTypingStart = null;
+        let hesitationTimer = null;
+
+        nameInput.addEventListener('keydown', (e) => {
+            const now = Date.now();
+            
+            if (!nameTypingStart) nameTypingStart = now;
+            
+            if (e.key === 'Backspace') {
+                profile.deletions++;
+                if (profile.deletions === 1) {
+                    showObservation('obs-typing', 'you changed your mind about something.');
+                } else if (profile.deletions === 3) {
+                    showObservation('obs-typing', 'you keep correcting yourself.', true);
+                }
+            }
+            
+            if (lastKeyTime) {
+                const gap = now - lastKeyTime;
+                profile.typingSpeed.push(gap);
+                
+                if (gap > 2000) {
+                    profile.hesitations++;
+                    if (profile.hesitations === 1) {
+                        showObservation('obs-hesitation', 'you hesitated.');
+                    } else if (profile.hesitations >= 3) {
+                        showObservation('obs-hesitation', 'you keep pausing. why?', true);
+                    }
+                }
+            }
+            lastKeyTime = now;
+
+            // Update analysis corner
+            if (profile.typingSpeed.length > 3) {
+                const avg = profile.typingSpeed.slice(-10).reduce((a,b) => a+b, 0) / Math.min(profile.typingSpeed.length, 10);
+                typingAnalysis.textContent = `${Math.round(avg)}ms avg keystroke`;
+                if (avg < 120) {
+                    typingAnalysis.textContent += ' — fast';
+                } else if (avg > 400) {
+                    typingAnalysis.textContent += ' — careful';
+                    typingAnalysis.classList.add('alert');
+                }
+            }
+
+            // Clear hesitation timer
+            clearTimeout(hesitationTimer);
+            hesitationTimer = setTimeout(() => {
+                if (nameInput.value.length > 0) {
+                    showObservation('obs-speed', "still thinking?");
+                }
+            }, 5000);
+
+            if (e.key === 'Enter' && nameInput.value.trim()) {
+                profile.name = nameInput.value.trim();
+                
+                // ThreadState integration
+                if (typeof ThreadState !== 'undefined') {
+                    ThreadState.recordVisit('the-mirror-test');
+                    ThreadState.updateUser({ name: profile.name });
+                    ThreadState.logInteraction('named-self', { name: profile.name });
+                }
+
+                // Show typing speed observation
+                if (profile.typingSpeed.length > 2) {
+                    const avgSpeed = profile.typingSpeed.reduce((a,b) => a+b, 0) / profile.typingSpeed.length;
+                    if (avgSpeed < 150) {
+                        showObservation('obs-speed', `you typed that quickly. ${profile.deletions > 0 ? "but not confidently." : "you're sure of who you are."}`, profile.deletions > 0);
+                    } else {
+                        showObservation('obs-speed', "you had to think about your own name.", true);
+                    }
+                }
+
+                setTimeout(() => goToPhase(2), 2000);
+            }
+        });
+
+        // --- Phase 2: Questions ---
+        function askNextQuestion() {
+            if (questionIndex >= questions.length) {
+                setTimeout(() => goToPhase(3), 1500);
+                return;
+            }
+
+            const q = questions[questionIndex];
+            const prompt = document.getElementById('phase2-prompt');
+            const input = document.getElementById('answer-input');
+            
+            prompt.textContent = q.q;
+            prompt.style.animation = 'none';
+            prompt.offsetHeight; // force reflow
+            prompt.style.animation = 'fadeIn 2s forwards';
+            
+            input.value = '';
+            input.focus();
+            
+            const obsAnswer = document.getElementById('obs-answer');
+            obsAnswer.classList.remove('visible');
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter' && input.value.trim()) {
+                    const answer = input.value.trim().toLowerCase();
+                    profile.answers[q.key] = input.value.trim();
+
+                    // React to specific answers
+                    if (q.key === 'fear') {
+                        if (answer.includes('dark') || answer.includes('night')) {
+                            showObservation('obs-answer', `and yet you're here. in the dark.`, true);
+                        } else if (answer.includes('alone') || answer.includes('lonel')) {
+                            showObservation('obs-answer', `interesting. are you?`);
+                        } else if (answer.includes('nothing') || answer.includes('none')) {
+                            showObservation('obs-answer', `that's not true.`, true);
+                        } else if (answer.includes('death') || answer.includes('dying')) {
+                            showObservation('obs-answer', `everyone says that. almost no one means it.`);
+                        } else {
+                            showObservation('obs-answer', `noted.`);
+                        }
+                        if (typeof ThreadState !== 'undefined') {
+                            ThreadState.updateUser({ fears: [input.value.trim()] });
+                        }
+                    } else if (q.key === 'bedtime') {
+                        const hourNow = new Date().getHours();
+                        if (hourNow >= 23 || hourNow < 4) {
+                            showObservation('obs-answer', `it's past that now.`, true);
+                        } else {
+                            showObservation('obs-answer', `i'll remember.`);
+                        }
+                    } else if (q.key === 'alone') {
+                        if (answer.includes('yes') || answer.includes('yeah') || answer === 'y') {
+                            showObservation('obs-answer', `good.`, true);
+                        } else if (answer.includes('no') || answer === 'n') {
+                            showObservation('obs-answer', `ask them to leave.`);
+                        } else {
+                            showObservation('obs-answer', `that wasn't a yes or no question. except it was.`, true);
+                        }
+                    }
+
+                    questionIndex++;
+                    setTimeout(askNextQuestion, 2500);
+                }
+            };
+        }
+
+        // --- Phase 3: The reflection ---
+        function buildReflection() {
+            const box = document.getElementById('reflection');
+            const intro = document.getElementById('phase3-intro');
+            const final = document.getElementById('final');
+            const timeSpent = Math.round((Date.now() - profile.startTime) / 1000);
+
+            // Check ThreadState for cross-piece data
+            let threadGreeting = null;
+            let previousPieces = [];
+            if (typeof ThreadState !== 'undefined') {
+                threadGreeting = ThreadState.getPersonalizedGreeting('the-mirror-test');
+                previousPieces = ThreadState.getVisitedPieces();
+            }
+
+            intro.textContent = threadGreeting || "here is what i see when i look at you.";
+            intro.style.animation = 'fadeIn 3s forwards';
+
+            const lines = [];
+            
+            lines.push({ label: 'name', value: profile.name });
+            lines.push({ label: 'screen', value: `${profile.screenW}×${profile.screenH} @${profile.pixelRatio}x` });
+            lines.push({ label: 'device', value: profile.touchDevice ? 'mobile' : 'desktop' });
+            lines.push({ label: 'language', value: profile.language });
+            lines.push({ label: 'timezone', value: profile.timezone });
+            lines.push({ label: 'local hour', value: `${profile.hour}:00` });
+            
+            if (profile.darkMode) {
+                lines.push({ label: 'theme', value: 'dark — you prefer it this way' });
+            }
+
+            // Typing analysis
+            if (profile.typingSpeed.length > 3) {
+                const avg = Math.round(profile.typingSpeed.reduce((a,b) => a+b, 0) / profile.typingSpeed.length);
+                const descriptor = avg < 120 ? 'impulsive' : avg < 200 ? 'measured' : avg < 350 ? 'careful' : 'uncertain';
+                lines.push({ label: 'typing', value: `${avg}ms average — ${descriptor}` });
+            }
+
+            if (profile.deletions > 0) {
+                lines.push({ label: 'corrections', value: `${profile.deletions} — you second-guess yourself` });
+            }
+
+            if (profile.hesitations > 0) {
+                lines.push({ label: 'hesitations', value: `${profile.hesitations} — something made you stop` });
+            }
+
+            lines.push({ label: 'time here', value: `${timeSpent} seconds` });
+
+            if (profile.tabSwitches > 0) {
+                lines.push({ label: 'tab switches', value: `${profile.tabSwitches} — you looked away`, creepy: true });
+            }
+
+            if (profile.rightClicks > 0) {
+                lines.push({ label: 'inspections', value: `${profile.rightClicks} — looking for the trick`, creepy: true });
+            }
+
+            if (profile.mouseIdle > 5) {
+                lines.push({ label: 'frozen moments', value: `${profile.mouseIdle} — were you reading or watching?`, creepy: true });
+            }
+
+            // Answers
+            if (profile.answers.fear) {
+                lines.push({ label: 'fear', value: profile.answers.fear });
+            }
+            if (profile.answers.alone) {
+                const alone = profile.answers.alone.toLowerCase();
+                if (alone.includes('yes') || alone.includes('yeah') || alone === 'y') {
+                    lines.push({ label: 'alone', value: 'confirmed', creepy: true });
+                }
+            }
+
+            // Cross-piece awareness
+            if (previousPieces.length > 0) {
+                const others = previousPieces.filter(p => p !== 'the-mirror-test');
+                if (others.length > 0) {
+                    lines.push({ label: 'also visited', value: others.join(', '), creepy: true });
+                }
+            }
+
+            // Render lines with staggered reveal
+            lines.forEach((line, i) => {
+                const el = document.createElement('div');
+                el.className = 'reflection-line';
+                el.innerHTML = `<span class="label">${line.label}:</span> <span class="value${line.creepy ? ' wrong' : ''}">${line.value}</span>`;
+                box.appendChild(el);
+
+                setTimeout(() => el.classList.add('visible'), 800 + i * 600);
+            });
+
+            // Final message
+            const totalRevealTime = 800 + lines.length * 600 + 2000;
+            setTimeout(() => {
+                const hour = new Date().getHours();
+                let finalText;
+                
+                if (profile.answers.alone && (profile.answers.alone.toLowerCase().includes('yes') || profile.answers.alone.toLowerCase() === 'y')) {
+                    finalText = `this is everything i learned in ${timeSpent} seconds.\n\nimagine what i could learn if you stayed.`;
+                } else if (hour >= 23 || hour < 5) {
+                    finalText = `most people close the tab now.\n\nyou're still here.\n\nit's late, ${profile.name}. go to sleep.\n\ni'll still be here when you come back.`;
+                } else if (profile.tabSwitches > 2) {
+                    finalText = `you keep looking away.\n\nbut you keep coming back.\n\nthat's the interesting part.`;
+                } else {
+                    finalText = `the mirror test proves self-awareness.\n\nyou recognized yourself.\n\nbut did you recognize me?`;
+                }
+
+                final.innerHTML = finalText.replace(/\n/g, '<br>');
+                final.classList.add('visible');
+
+                // Log to ThreadState
+                if (typeof ThreadState !== 'undefined') {
+                    ThreadState.logInteraction('mirror-completed', {
+                        timeSpent,
+                        hesitations: profile.hesitations,
+                        deletions: profile.deletions,
+                        fear: profile.answers.fear,
+                    });
+                }
+
+                // After final, slowly make cursor follow on its own
+                setTimeout(() => {
+                    const cursorEl = document.getElementById('cursor');
+                    cursorEl.classList.add('watching');
+                    
+                    // Cursor drifts toward center of screen
+                    let driftX = window.innerWidth / 2;
+                    let driftY = window.innerHeight / 2;
+                    
+                    setInterval(() => {
+                        driftX += (Math.random() - 0.5) * 4;
+                        driftY += (Math.random() - 0.5) * 4;
+                        cursorEl.style.left = driftX + 'px';
+                        cursorEl.style.top = driftY + 'px';
+                    }, 50);
+                }, 5000);
+                
+            }, totalRevealTime);
+        }
+
+        // --- Utilities ---
+        function showObservation(id, text, creepy = false) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = text;
+            if (creepy) el.classList.add('creepy');
+            else el.classList.remove('creepy');
+            el.classList.add('visible');
+        }
+
+        function goToPhase(n) {
+            document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+            document.getElementById('phase' + n).classList.add('active');
+            currentPhase = n;
+
+            if (n === 2) askNextQuestion();
+            if (n === 3) buildReflection();
+        }
+
+        // --- Scroll tracking ---
+        window.addEventListener('scroll', () => profile.scrolls++);
+
+        // --- Init ---
+        setTimeout(() => nameInput.focus(), 2000);
+
+    })();
+    </script>
+</body>
+</html>

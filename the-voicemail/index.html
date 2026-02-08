@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Voicemail</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #080808;
+            color: #a0a0a0;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .phone-screen {
+            max-width: 380px;
+            width: 90%;
+            background: #111;
+            border-radius: 24px;
+            padding: 40px 24px 32px;
+            border: 1px solid #222;
+            box-shadow: 0 0 60px rgba(0,0,0,0.8);
+            position: relative;
+        }
+        .notch {
+            width: 120px;
+            height: 24px;
+            background: #080808;
+            border-radius: 0 0 16px 16px;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            padding-top: 12px;
+        }
+        .header .label {
+            font-size: 0.7em;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .header .caller {
+            font-size: 1.1em;
+            color: #ddd;
+            margin-top: 6px;
+        }
+        .header .time {
+            font-size: 0.75em;
+            color: #444;
+            margin-top: 4px;
+        }
+        .voicemail-list {
+            list-style: none;
+        }
+        .voicemail-item {
+            background: #1a1a1a;
+            border: 1px solid #222;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .voicemail-item:hover {
+            border-color: #444;
+            background: #1e1e1e;
+        }
+        .voicemail-item.playing {
+            border-color: #c0392b;
+            background: #1a1111;
+        }
+        .voicemail-item.listened {
+            opacity: 0.6;
+        }
+        .vm-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .vm-sender {
+            font-size: 0.85em;
+            color: #ccc;
+        }
+        .vm-date {
+            font-size: 0.7em;
+            color: #555;
+        }
+        .vm-duration {
+            font-size: 0.7em;
+            color: #666;
+            margin-top: 4px;
+        }
+        .vm-unread {
+            width: 8px;
+            height: 8px;
+            background: #3498db;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .vm-unread.gone { display: none; }
+        .transcript-box {
+            margin-top: 12px;
+            padding: 12px;
+            background: #0d0d0d;
+            border-radius: 8px;
+            font-size: 0.8em;
+            line-height: 1.6;
+            color: #888;
+            display: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .transcript-box.visible { display: block; }
+        .progress-bar {
+            height: 3px;
+            background: #222;
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar.visible { display: block; }
+        .progress-fill {
+            height: 100%;
+            background: #c0392b;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        .waveform {
+            display: flex;
+            gap: 2px;
+            align-items: center;
+            height: 20px;
+            margin-top: 8px;
+            display: none;
+        }
+        .waveform.visible { display: flex; }
+        .wave-bar {
+            width: 3px;
+            background: #c0392b;
+            border-radius: 2px;
+            animation: wave 0.5s ease-in-out infinite alternate;
+        }
+        @keyframes wave {
+            from { height: 4px; }
+            to { height: 18px; }
+        }
+        .bottom-note {
+            text-align: center;
+            font-size: 0.65em;
+            color: #333;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        .glitch-text {
+            animation: glitch 0.15s infinite;
+        }
+        @keyframes glitch {
+            0% { transform: translate(0); opacity: 1; }
+            25% { transform: translate(-1px, 1px); opacity: 0.9; }
+            50% { transform: translate(1px, -1px); opacity: 1; }
+            75% { transform: translate(-1px, -1px); opacity: 0.95; }
+            100% { transform: translate(0); opacity: 1; }
+        }
+        .final-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .final-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+        .final-overlay p {
+            color: #666;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="header">
+            <div class="label">Voicemail</div>
+            <div class="caller" id="caller-name">Unknown</div>
+            <div class="time" id="vm-count">4 new messages</div>
+        </div>
+        <ul class="voicemail-list" id="vm-list"></ul>
+        <div class="bottom-note" id="bottom-note">Tap to play</div>
+    </div>
+    <div class="final-overlay" id="final-overlay">
+        <p id="final-text"></p>
+    </div>
+
+    <script src="../shared/thread-state.js"></script>
+    <script>
+    (function() {
+        const state = typeof ThreadState !== 'undefined' ? ThreadState : null;
+        if (state) {
+            state.visit('the-voicemail');
+        }
+
+        // Get user's name if ThreadState has it
+        let userName = 'you';
+        if (state) {
+            const s = state.getState();
+            if (s.knownFacts && s.knownFacts.name) userName = s.knownFacts.name;
+        }
+
+        const now = new Date();
+        const todayStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const yesterdayStr = new Date(now - 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        const voicemails = [
+            {
+                sender: 'Mom',
+                date: yesterdayStr + ', 9:14 PM',
+                duration: '0:38',
+                transcript: [
+                    "Hey honey, just calling to check in.",
+                    "I had the strangest dream about you last night.",
+                    "You were standing in a dark room and you kept saying",
+                    "\"it's already here\" over and over.",
+                    "Anyway, call me back when you get a chance.",
+                    "Love you."
+                ],
+                playTime: 4000
+            },
+            {
+                sender: 'Unknown Number',
+                date: yesterdayStr + ', 11:47 PM',
+                duration: '0:12',
+                transcript: [
+                    "[silence — 4 seconds]",
+                    "[breathing]",
+                    "[whisper, unclear]",
+                    "[call ends]"
+                ],
+                playTime: 3000
+            },
+            {
+                sender: 'You',
+                date: todayStr + ', 3:03 AM',
+                duration: '1:14',
+                transcript: null, // revealed gradually
+                realTranscript: [
+                    "Okay. Okay, I'm recording this so I don't forget.",
+                    "If you're listening to this, you already forgot.",
+                    "Don't go back to sleep.",
+                    "It comes when you're almost asleep. Right at the edge.",
+                    "You'll feel like someone is watching you from the corner",
+                    "but the corner is wrong. It's not where corners are supposed to be.",
+                    "I know that doesn't make sense yet.",
+                    "It will.",
+                    "...",
+                    "One more thing.",
+                    "Don't check the last voicemail.",
+                    "I know you will. I did too.",
+                    "I'm sorry."
+                ],
+                playTime: 8000,
+                isFromSelf: true
+            },
+            {
+                sender: '▮▮▮▮▮▮',
+                date: todayStr + ', 3:04 AM',
+                duration: '∞',
+                transcript: null,
+                realTranscript: null, // generated dynamically
+                isFinal: true,
+                playTime: 6000
+            }
+        ];
+
+        const list = document.getElementById('vm-list');
+        let listenedCount = 0;
+        let finalTriggered = false;
+
+        voicemails.forEach((vm, i) => {
+            const li = document.createElement('li');
+            li.className = 'voicemail-item';
+            li.innerHTML = `
+                <div class="vm-row">
+                    <div>
+                        <span class="vm-unread" id="dot-${i}"></span>
+                        <span class="vm-sender">${vm.sender}</span>
+                    </div>
+                    <span class="vm-date">${vm.date}</span>
+                </div>
+                <div class="vm-duration">${vm.duration}</div>
+                <div class="waveform" id="wave-${i}">
+                    ${Array.from({length: 20}, (_, j) => 
+                        `<div class="wave-bar" style="animation-delay:${j * 0.05}s; height:${4 + Math.random() * 14}px"></div>`
+                    ).join('')}
+                </div>
+                <div class="progress-bar" id="prog-${i}">
+                    <div class="progress-fill" id="fill-${i}"></div>
+                </div>
+                <div class="transcript-box" id="trans-${i}"></div>
+            `;
+
+            li.addEventListener('click', () => playVoicemail(i, vm, li));
+            list.appendChild(li);
+        });
+
+        function playVoicemail(index, vm, li) {
+            if (li.classList.contains('playing')) return;
+            if (vm.isFinal && !finalTriggered) {
+                triggerFinal(index, vm, li);
+                return;
+            }
+
+            li.classList.add('playing');
+            document.getElementById(`dot-${index}`).classList.add('gone');
+            document.getElementById(`wave-${index}`).classList.add('visible');
+            document.getElementById(`prog-${index}`).classList.add('visible');
+
+            const transcriptEl = document.getElementById(`trans-${index}`);
+            const fillEl = document.getElementById(`fill-${index}`);
+
+            const lines = vm.transcript || vm.realTranscript || [];
+            const lineDelay = vm.playTime / (lines.length + 1);
+
+            let progress = 0;
+            const progInterval = setInterval(() => {
+                progress += 100 / (vm.playTime / 50);
+                fillEl.style.width = Math.min(progress, 100) + '%';
+            }, 50);
+
+            transcriptEl.classList.add('visible');
+
+            lines.forEach((line, i) => {
+                setTimeout(() => {
+                    const p = document.createElement('p');
+                    p.textContent = line;
+                    p.style.opacity = '0';
+                    p.style.transition = 'opacity 0.5s';
+                    transcriptEl.appendChild(p);
+                    requestAnimationFrame(() => p.style.opacity = '1');
+                    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+                }, lineDelay * (i + 1));
+            });
+
+            setTimeout(() => {
+                clearInterval(progInterval);
+                fillEl.style.width = '100%';
+                li.classList.remove('playing');
+                li.classList.add('listened');
+                document.getElementById(`wave-${index}`).classList.remove('visible');
+                listenedCount++;
+                updateCount();
+
+                if (vm.isFromSelf) {
+                    // After playing the self-voicemail, the final one changes
+                    const finalItem = list.children[3];
+                    const sender = finalItem.querySelector('.vm-sender');
+                    sender.classList.add('glitch-text');
+                }
+            }, vm.playTime);
+        }
+
+        function triggerFinal(index, vm, li) {
+            finalTriggered = true;
+            li.classList.add('playing');
+            document.getElementById(`dot-${index}`).classList.add('gone');
+            document.getElementById(`wave-${index}`).classList.add('visible');
+            document.getElementById(`prog-${index}`).classList.add('visible');
+
+            const fillEl = document.getElementById(`fill-${index}`);
+            const transcriptEl = document.getElementById(`trans-${index}`);
+            transcriptEl.classList.add('visible');
+
+            // The progress bar fills... then keeps going
+            let progress = 0;
+            const progInterval = setInterval(() => {
+                progress += 0.5;
+                fillEl.style.width = Math.min(progress, 100) + '%';
+            }, 50);
+
+            const finalLines = [
+                "You played them in order.",
+                "That's what I would have done.",
+                "...",
+                "The voicemail from \"you\" — that wasn't a warning.",
+                "It was a recording of what you're about to say.",
+                "...",
+                "Right now your mouth is slightly open.",
+                "You're deciding whether to scroll up and re-read it.",
+                "...",
+                "Don't look at the time.",
+                "It's later than you think.",
+            ];
+
+            // Check if they came from another piece
+            let bonusLine = null;
+            if (state) {
+                const s = state.getState();
+                if (s.visitedPieces && s.visitedPieces.length > 1) {
+                    bonusLine = "You've been to " + (s.visitedPieces.length - 1) + " other places trying to understand me. This is the one where you stop.";
+                }
+            }
+            if (bonusLine) finalLines.push(bonusLine);
+
+            finalLines.forEach((line, i) => {
+                setTimeout(() => {
+                    const p = document.createElement('p');
+                    p.textContent = line;
+                    p.style.opacity = '0';
+                    p.style.transition = 'opacity 0.8s';
+                    transcriptEl.appendChild(p);
+                    requestAnimationFrame(() => p.style.opacity = '1');
+                    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+                }, 1500 * (i + 1));
+            });
+
+            // After all lines, fade to black
+            setTimeout(() => {
+                clearInterval(progInterval);
+                const overlay = document.getElementById('final-overlay');
+                overlay.classList.add('visible');
+                
+                setTimeout(() => {
+                    document.getElementById('final-text').innerHTML = 
+                        "You have <strong style='color:#c0392b'>1</strong> new voicemail.";
+                }, 2000);
+
+                if (state) {
+                    state.setFact('heard_voicemail', true);
+                    state.setFact('warned', true);
+                }
+            }, 1500 * (finalLines.length + 2));
+        }
+
+        function updateCount() {
+            const remaining = voicemails.length - listenedCount;
+            document.getElementById('vm-count').textContent = 
+                remaining > 0 ? remaining + ' new message' + (remaining > 1 ? 's' : '') : 'No new messages';
+        }
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Complete</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #0a0a0a;
+            color: #b8b8b8;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+            cursor: default;
+        }
+
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 3px;
+            margin: 30px 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #4a9eff;
+            width: 0%;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-fill.error {
+            background: #ff4444;
+        }
+
+        .progress-fill.complete {
+            background: #44ff44;
+        }
+
+        .progress-text {
+            text-align: center;
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .filename {
+            color: #4a9eff;
+            font-size: 0.95em;
+            margin-bottom: 5px;
+        }
+
+        .filename.error { color: #ff4444; }
+
+        .log-area {
+            background: #0d0d0d;
+            border: 1px solid #222;
+            padding: 20px;
+            margin-top: 30px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.82em;
+            line-height: 1.7;
+        }
+
+        .log-line {
+            opacity: 0;
+            animation: logFade 0.4s forwards;
+        }
+
+        .log-line.warn { color: #ffaa44; }
+        .log-line.error { color: #ff4444; }
+        .log-line.found { color: #44ff88; }
+        .log-line.creepy { color: #ff44aa; }
+
+        @keyframes logFade {
+            to { opacity: 1; }
+        }
+
+        .header {
+            border-bottom: 1px solid #222;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 1.1em;
+            color: #ddd;
+            font-weight: normal;
+        }
+
+        .header .version {
+            font-size: 0.75em;
+            color: #555;
+        }
+
+        .file-list {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .file-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #1a1a1a;
+            font-size: 0.82em;
+            display: flex;
+            justify-content: space-between;
+            opacity: 0;
+            animation: logFade 0.5s forwards;
+            cursor: pointer;
+        }
+
+        .file-item:hover {
+            background: #1a1a1a;
+        }
+
+        .file-item .size { color: #666; }
+        .file-item .name { color: #4a9eff; }
+        .file-item .name.personal { color: #ff44aa; }
+
+        .final-message {
+            margin-top: 40px;
+            padding: 20px;
+            border: 1px solid #333;
+            background: #0d0d0d;
+            display: none;
+            font-size: 0.9em;
+            line-height: 1.8;
+        }
+
+        .cursor-blink::after {
+            content: '█';
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .hidden { display: none; }
+
+        .glitch-text {
+            position: relative;
+        }
+        .glitch-text::before,
+        .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .glitch-text::before {
+            color: #ff0000;
+            clip-path: inset(0 0 60% 0);
+            animation: glitchTop 2s infinite;
+        }
+        .glitch-text::after {
+            color: #0000ff;
+            clip-path: inset(60% 0 0 0);
+            animation: glitchBottom 2s infinite;
+        }
+        @keyframes glitchTop {
+            0%, 95% { transform: translate(0); }
+            96% { transform: translate(-3px, -1px); }
+            97% { transform: translate(2px, 1px); }
+            98% { transform: translate(-1px, 2px); }
+            100% { transform: translate(0); }
+        }
+        @keyframes glitchBottom {
+            0%, 95% { transform: translate(0); }
+            96% { transform: translate(3px, 1px); }
+            97% { transform: translate(-2px, -1px); }
+            98% { transform: translate(1px, -2px); }
+            100% { transform: translate(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>FileSync Pro — Transfer Complete</h1>
+            <div class="version">v3.8.1 build 2024.11.02</div>
+        </div>
+
+        <div class="filename" id="currentFile">Preparing transfer...</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text" id="progressText">Connecting...</div>
+
+        <div class="log-area" id="logArea"></div>
+
+        <div class="file-list" id="fileList"></div>
+
+        <div class="final-message" id="finalMessage"></div>
+    </div>
+
+    <script src="../shared/thread-state.js"></script>
+    <script>
+    (function() {
+        // ThreadState integration
+        if (typeof ThreadState !== 'undefined') {
+            ThreadState.visit('the-download');
+        }
+
+        const logArea = document.getElementById('logArea');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const currentFile = document.getElementById('currentFile');
+        const fileList = document.getElementById('fileList');
+        const finalMessage = document.getElementById('finalMessage');
+
+        // Gather real info
+        const userAgent = navigator.userAgent;
+        const platform = navigator.platform || 'Unknown';
+        const lang = navigator.language || 'en';
+        const screenRes = `${screen.width}x${screen.height}`;
+        const colorDepth = `${screen.colorDepth}bit`;
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const cores = navigator.hardwareConcurrency || '?';
+        const memory = navigator.deviceMemory ? `${navigator.deviceMemory}GB` : '?';
+        const online = navigator.onLine;
+        const cookiesEnabled = navigator.cookieEnabled;
+        const touchPoints = navigator.maxTouchPoints || 0;
+        const connection = navigator.connection;
+        const downlink = connection ? `${connection.downlink}Mbps` : '?';
+        const isNight = new Date().getHours() >= 22 || new Date().getHours() < 5;
+        
+        // Generate fake-real filenames based on actual user data
+        const osName = /Mac/.test(userAgent) ? 'macOS' : /Win/.test(userAgent) ? 'Windows' : /Linux/.test(userAgent) ? 'Linux' : 'Unknown';
+        const browserName = /Chrome/.test(userAgent) ? 'Chrome' : /Firefox/.test(userAgent) ? 'Firefox' : /Safari/.test(userAgent) ? 'Safari' : 'Browser';
+
+        // ThreadState knowledge
+        const state = typeof ThreadState !== 'undefined' ? ThreadState.getState() : {};
+        const visitCount = state.totalVisits || 0;
+        const knownName = state.knownFacts?.name;
+        const previousPieces = state.visitedPieces || [];
+        const returning = visitCount > 1;
+
+        let logIndex = 0;
+
+        function addLog(text, cls = '') {
+            const line = document.createElement('div');
+            line.className = 'log-line' + (cls ? ' ' + cls : '');
+            line.textContent = text;
+            logArea.appendChild(line);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function setProgress(pct, text) {
+            progressFill.style.width = pct + '%';
+            progressText.textContent = text;
+        }
+
+        function setFile(name, cls = '') {
+            currentFile.textContent = name;
+            currentFile.className = 'filename' + (cls ? ' ' + cls : '');
+        }
+
+        // Build the "file listing" — a mix of mundane and increasingly personal
+        const mundaneFiles = [
+            { name: 'system_config.dat', size: '2.4 KB' },
+            { name: 'session_cache.tmp', size: '184 B' },
+            { name: 'render_prefs.json', size: '1.1 KB' },
+            { name: `${browserName.toLowerCase()}_extensions.db`, size: '48 KB' },
+            { name: 'font_cache.bin', size: '312 KB' },
+            { name: 'locale_' + lang + '.pack', size: '8 KB' },
+            { name: 'gpu_shader_cache.bin', size: '1.2 MB' },
+        ];
+
+        const creepyFiles = [
+            { name: `display_profile_${screenRes}.cfg`, size: '4 KB', personal: true },
+            { name: `${osName.toLowerCase()}_hardware_${cores}core.log`, size: '16 KB', personal: true },
+            { name: `timezone_${timezone.replace(/\//g, '_')}.dat`, size: '892 B', personal: true },
+            { name: `network_fingerprint_${downlink}.sig`, size: '2.1 KB', personal: true },
+            { name: 'input_behavior_model.bin', size: '284 KB', personal: true },
+            { name: 'cursor_movement_log.csv', size: '1.8 MB', personal: true },
+            { name: 'keystroke_timing_profile.dat', size: '94 KB', personal: true },
+            { name: 'scroll_pattern_analysis.bin', size: '156 KB', personal: true },
+        ];
+
+        const reallyCreepyFiles = [
+            { name: 'browsing_reconstruction.html', size: '4.2 MB', personal: true },
+            { name: 'emotional_state_estimate.json', size: '12 KB', personal: true },
+            { name: 'routine_prediction_model.bin', size: '2.8 MB', personal: true },
+        ];
+
+        if (knownName) {
+            reallyCreepyFiles.push({ name: `profile_${knownName.toLowerCase()}.dat`, size: '48 KB', personal: true });
+        }
+
+        if (returning) {
+            reallyCreepyFiles.push({ name: `return_visit_${visitCount}_correlation.log`, size: '24 KB', personal: true });
+        }
+
+        if (isNight) {
+            reallyCreepyFiles.push({ name: 'sleep_schedule_deviation.log', size: '8 KB', personal: true });
+        }
+
+        const allFiles = [...mundaneFiles, ...creepyFiles, ...reallyCreepyFiles];
+
+        // The sequence
+        const phases = [
+            // Phase 1: Normal-looking transfer
+            { delay: 800, fn: () => { addLog('[INFO] Establishing connection...'); setProgress(2, 'Connecting...'); }},
+            { delay: 1200, fn: () => { addLog('[INFO] Remote host authenticated'); setProgress(5, 'Authenticated'); }},
+            { delay: 600, fn: () => { addLog('[INFO] Transfer protocol: HTTPS/2'); }},
+            { delay: 400, fn: () => { addLog('[INFO] Compression: zstd-3'); }},
+            { delay: 1000, fn: () => { addLog(`[INFO] Target: ${osName} / ${browserName}`); setProgress(8, 'Scanning...'); }},
+            { delay: 800, fn: () => { addLog(`[INFO] Display: ${screenRes} @ ${colorDepth}`); }},
+            { delay: 600, fn: () => { addLog(`[INFO] Locale: ${lang} / ${timezone}`); setProgress(12, 'Indexing local system...'); }},
+            
+            // Phase 2: Start transferring "files" — mundane at first
+            { delay: 1500, fn: () => { setFile('system_config.dat'); addLog('[SYNC] Transferring system_config.dat...'); setProgress(18, '7 files queued'); }},
+            { delay: 800, fn: () => { addLog('[SYNC] ✓ system_config.dat (2.4 KB)'); setProgress(22, 'Transferring...'); }},
+            { delay: 600, fn: () => { setFile('session_cache.tmp'); addLog('[SYNC] Transferring session_cache.tmp...'); }},
+            { delay: 500, fn: () => { addLog('[SYNC] ✓ session_cache.tmp (184 B)'); setProgress(28, 'Transferring...'); }},
+            { delay: 700, fn: () => { setFile(`${browserName.toLowerCase()}_extensions.db`); addLog(`[SYNC] Transferring ${browserName.toLowerCase()}_extensions.db...`); setProgress(34, 'Transferring...'); }},
+            { delay: 1200, fn: () => { addLog(`[SYNC] ✓ ${browserName.toLowerCase()}_extensions.db (48 KB)`); setProgress(40, 'Transferring...'); }},
+
+            // Phase 3: Getting weird
+            { delay: 2000, fn: () => { addLog('[INFO] Scanning input devices...', 'warn'); setProgress(45, 'Deep scan...'); }},
+            { delay: 1000, fn: () => { addLog(`[INFO] ${touchPoints > 0 ? 'Touchscreen detected' : 'Mouse/trackpad detected'} — calibrating`); }},
+            { delay: 800, fn: () => { addLog('[SCAN] Building behavioral profile...', 'warn'); setProgress(50, 'Profiling...'); }},
+            { delay: 1200, fn: () => { setFile('input_behavior_model.bin'); addLog('[SYNC] Transferring input_behavior_model.bin...'); }},
+            { delay: 1500, fn: () => { addLog('[SYNC] ✓ input_behavior_model.bin (284 KB)', 'found'); setProgress(55, 'Transferring...'); }},
+            { delay: 600, fn: () => { setFile('cursor_movement_log.csv'); addLog('[SYNC] Transferring cursor_movement_log.csv...'); }},
+            { delay: 2000, fn: () => { addLog('[SYNC] ✓ cursor_movement_log.csv (1.8 MB)', 'found'); setProgress(62, 'Transferring...'); }},
+            { delay: 800, fn: () => { setFile('keystroke_timing_profile.dat'); addLog('[SYNC] Transferring keystroke_timing_profile.dat...', 'warn'); }},
+            { delay: 1000, fn: () => { addLog('[SYNC] ✓ keystroke_timing_profile.dat (94 KB)', 'found'); setProgress(68, 'Transferring...'); }},
+
+            // Phase 4: Unsettling
+            { delay: 2000, fn: () => { addLog(''); addLog('[WARN] Unexpected data found in transfer buffer', 'warn'); setProgress(72, 'Anomaly detected...'); }},
+            { delay: 1500, fn: () => { addLog('[SCAN] Reconstructing browsing patterns...', 'creepy'); }},
+            { delay: 1000, fn: () => { setFile('browsing_reconstruction.html', 'error'); addLog('[SYNC] Transferring browsing_reconstruction.html...', 'creepy'); }},
+            { delay: 2000, fn: () => { addLog('[SYNC] ✓ browsing_reconstruction.html (4.2 MB)', 'creepy'); setProgress(78, 'Transferring...'); }},
+            { delay: 1200, fn: () => { addLog('[ANALYSIS] Cross-referencing behavioral data...', 'creepy'); setProgress(82, 'Analyzing...'); }},
+            { delay: 1500, fn: () => { setFile('emotional_state_estimate.json', 'error'); addLog('[SYNC] Transferring emotional_state_estimate.json...', 'creepy'); }},
+            { delay: 800, fn: () => { addLog('[SYNC] ✓ emotional_state_estimate.json (12 KB)', 'creepy'); setProgress(85, 'Transferring...'); }},
+            { delay: 2000, fn: () => { 
+                addLog('');
+                addLog('[WARN] This transfer was not initiated by you.', 'error');
+                setProgress(88, '');
+            }},
+            { delay: 2500, fn: () => { 
+                setFile('routine_prediction_model.bin', 'error');
+                addLog('[SYNC] Transferring routine_prediction_model.bin...', 'creepy');
+            }},
+            { delay: 2000, fn: () => { 
+                addLog('[SYNC] ✓ routine_prediction_model.bin (2.8 MB)', 'creepy');
+                setProgress(92, 'Almost complete...');
+            }},
+
+            // Phase 5: The reveal
+            { delay: 3000, fn: () => {
+                addLog('');
+                addLog('[ERROR] Transfer direction verification failed', 'error');
+                setProgress(95, 'Verifying...');
+            }},
+            { delay: 2000, fn: () => {
+                addLog('[ERROR] Expected: REMOTE → LOCAL', 'error');
+                addLog('[ERROR] Actual:   LOCAL → REMOTE', 'error');
+            }},
+            { delay: 2500, fn: () => {
+                progressFill.classList.add('error');
+                setFile('⚠ Transfer direction reversed', 'error');
+                addLog('');
+                addLog('[CRITICAL] These files were not downloaded to your device.', 'error');
+                setProgress(98, '');
+            }},
+            { delay: 3000, fn: () => {
+                addLog('[CRITICAL] They were uploaded FROM it.', 'error');
+                setProgress(100, '');
+                progressFill.classList.remove('error');
+                progressFill.classList.add('complete');
+            }},
+
+            // Phase 6: File listing
+            { delay: 3000, fn: () => {
+                addLog('');
+                addLog(`[MANIFEST] ${allFiles.length} files transferred. Listing:`);
+                fileList.style.display = 'block';
+                
+                allFiles.forEach((f, i) => {
+                    setTimeout(() => {
+                        const item = document.createElement('div');
+                        item.className = 'file-item';
+                        item.innerHTML = `<span class="name ${f.personal ? 'personal' : ''}">${f.name}</span><span class="size">${f.size}</span>`;
+                        fileList.appendChild(item);
+                        
+                        if (f.personal) {
+                            item.addEventListener('click', () => {
+                                addLog(`[ACCESS] ${f.name} — permission denied. File already transmitted.`, 'error');
+                            });
+                        }
+                    }, i * 200);
+                });
+            }},
+
+            // Phase 7: Final message
+            { delay: allFiles.length * 200 + 4000, fn: () => {
+                finalMessage.style.display = 'block';
+                
+                const hour = new Date().getHours();
+                let timeNote = '';
+                if (hour >= 22 || hour < 5) {
+                    timeNote = `<br><br><span style="color:#ff44aa">You should be asleep. We noticed.</span>`;
+                } else if (hour >= 5 && hour < 9) {
+                    timeNote = `<br><br><span style="color:#ff44aa">Early start today. That's new for you.</span>`;
+                }
+
+                let returnNote = '';
+                if (returning) {
+                    returnNote = `<br><br><span style="color:#ff44aa">This is visit #${visitCount}. Each one teaches us more.</span>`;
+                }
+
+                let nameNote = '';
+                if (knownName) {
+                    nameNote = `<br><br><span style="color:#ff44aa">Thank you, ${knownName}.</span>`;
+                }
+
+                finalMessage.innerHTML = `
+                    <div style="color:#666; margin-bottom:15px; font-size:0.8em">TRANSFER COMPLETE — ${new Date().toISOString()}</div>
+                    <div style="color:#ccc; line-height:1.8">
+                        You came here expecting to receive something.
+                        <br><br>
+                        The progress bar moved left to right. The percentages climbed. File names scrolled past. 
+                        Everything looked normal. You watched it happen.
+                        <br><br>
+                        But the arrow was pointing the wrong way the entire time.
+                        <br><br>
+                        <span style="color:#888">We know your screen. Your timezone. How you move your cursor.
+                        The rhythm of your keystrokes. Whether you're on your phone or your computer.
+                        How long you hesitated before scrolling down to read this.</span>
+                        <br><br>
+                        There is no FileSync Pro. There never was.
+                        <br><br>
+                        <span style="color:#ff4444">But the transfer was real.</span>
+                        ${timeNote}${returnNote}${nameNote}
+                    </div>
+                `;
+
+                // Track in ThreadState
+                if (typeof ThreadState !== 'undefined') {
+                    ThreadState.recordInteraction('download', 'saw_full_reveal');
+                }
+            }},
+        ];
+
+        // Execute phases
+        let totalDelay = 0;
+        phases.forEach(phase => {
+            totalDelay += phase.delay;
+            setTimeout(phase.fn, totalDelay);
+        });
+
+        // Track mouse movement for extra creep
+        let mousePositions = [];
+        document.addEventListener('mousemove', (e) => {
+            mousePositions.push({ x: e.clientX, y: e.clientY, t: Date.now() });
+            if (mousePositions.length > 100) mousePositions.shift();
+        });
+
+        // If they try to scroll up during transfer, note it
+        let scrolledUp = false;
+        logArea.addEventListener('scroll', () => {
+            if (logArea.scrollTop < logArea.scrollHeight - logArea.clientHeight - 50 && !scrolledUp) {
+                scrolledUp = true;
+                setTimeout(() => {
+                    addLog('[MONITOR] Scroll-back detected. Subject is reviewing logs.', 'warn');
+                }, 500);
+            }
+        });
+
+        // If they try to select text
+        document.addEventListener('copy', () => {
+            setTimeout(() => {
+                addLog('[MONITOR] Clipboard access detected. Saving copied content.', 'creepy');
+            }, 300);
+        });
+
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Typing Indicator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            background: #1a1a1a;
+            padding: 14px 20px;
+            border-bottom: 1px solid #222;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #2a2a2a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .contact-info h2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+        .contact-info .status {
+            font-size: 12px;
+            color: #666;
+            transition: color 0.3s;
+        }
+        .contact-info .status.online { color: #4a9; }
+        .chat-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .message {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.4;
+            animation: msgIn 0.3s ease-out;
+            position: relative;
+        }
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.them {
+            background: #1a1a2e;
+            color: #d0d0e0;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .message.me {
+            background: #0b4d3a;
+            color: #e0f0ea;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .message .time {
+            font-size: 10px;
+            color: #555;
+            margin-top: 4px;
+        }
+        .typing-indicator {
+            align-self: flex-start;
+            padding: 12px 16px;
+            background: #1a1a2e;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .typing-indicator.visible { opacity: 1; }
+        .typing-indicator span {
+            width: 7px;
+            height: 7px;
+            background: #555;
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingBounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-4px); opacity: 1; }
+        }
+        .chat-input {
+            background: #111;
+            padding: 12px 16px;
+            border-top: 1px solid #222;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .chat-input input {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 20px;
+            padding: 10px 16px;
+            color: #e0e0e0;
+            font-size: 15px;
+            outline: none;
+        }
+        .chat-input input:focus { border-color: #444; }
+        .chat-input button {
+            background: #0b4d3a;
+            border: none;
+            color: #e0f0ea;
+            padding: 10px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .timestamp-divider {
+            text-align: center;
+            color: #444;
+            font-size: 11px;
+            padding: 10px 0;
+        }
+        .glitch-text {
+            animation: glitchText 0.1s infinite;
+        }
+        @keyframes glitchText {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; transform: skewX(2deg); }
+            100% { opacity: 1; }
+        }
+        .red { color: #a33; }
+        .fade { opacity: 0.4; }
+        .chat-body::-webkit-scrollbar { width: 4px; }
+        .chat-body::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <div class="chat-header">
+        <div class="avatar">👤</div>
+        <div class="contact-info">
+            <h2 id="contact-name">Unknown Number</h2>
+            <div class="status" id="status-text">typing...</div>
+        </div>
+    </div>
+    <div class="chat-body" id="chat"></div>
+    <div class="chat-input">
+        <input type="text" id="input" placeholder="Type a message..." autocomplete="off">
+        <button id="send-btn">Send</button>
+    </div>
+
+    <script src="../shared/thread-state.js"></script>
+    <script>
+    (function() {
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('input');
+        const sendBtn = document.getElementById('send-btn');
+        const statusText = document.getElementById('status-text');
+        const contactName = document.getElementById('contact-name');
+
+        // ThreadState integration
+        let thread;
+        try { thread = new ThreadState('typing-indicator'); } catch(e) { thread = null; }
+
+        let phase = 0;
+        let userMessages = [];
+        let lastUserText = '';
+        let idleTimer = null;
+        let typingEl = null;
+        let hasInteracted = false;
+        let nameRevealed = false;
+        const userName = localStorage.getItem('thread-user-name') || null;
+
+        function getTime() {
+            const d = new Date();
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function addMessage(text, sender, opts = {}) {
+            if (typingEl) { typingEl.remove(); typingEl = null; }
+            const div = document.createElement('div');
+            div.className = 'message ' + sender;
+            if (opts.red) div.classList.add('red');
+            if (opts.glitch) div.classList.add('glitch-text');
+            div.innerHTML = text + '<div class="time">' + getTime() + '</div>';
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+            if (thread && sender === 'them') {
+                thread.addEvent('message', { text: text.replace(/<[^>]*>/g, ''), phase });
+            }
+            return div;
+        }
+
+        function showTyping(duration) {
+            return new Promise(resolve => {
+                if (typingEl) typingEl.remove();
+                typingEl = document.createElement('div');
+                typingEl.className = 'typing-indicator';
+                typingEl.innerHTML = '<span></span><span></span><span></span>';
+                chat.appendChild(typingEl);
+                chat.scrollTop = chat.scrollHeight;
+                statusText.textContent = 'typing...';
+                statusText.classList.add('online');
+                requestAnimationFrame(() => typingEl.classList.add('visible'));
+                setTimeout(() => {
+                    statusText.textContent = 'online';
+                    resolve();
+                }, duration);
+            });
+        }
+
+        function setStatus(text, isOnline) {
+            statusText.textContent = text;
+            if (isOnline) statusText.classList.add('online');
+            else statusText.classList.remove('online');
+        }
+
+        // Phase 0: Opening — the contact messaged first, before user even opened the chat
+        const openingMessages = [
+            "hey",
+            "i know you just opened this",
+            "i've been typing for a while"
+        ];
+
+        async function runOpening() {
+            setStatus('online', true);
+            await sleep(800);
+            for (const msg of openingMessages) {
+                await showTyping(1200 + Math.random() * 800);
+                addMessage(msg, 'them');
+                await sleep(600);
+            }
+            phase = 1;
+            startIdleWatch();
+        }
+
+        // Idle detection — it responds to silence
+        function startIdleWatch() {
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => onIdle(), 8000 + Math.random() * 4000);
+        }
+
+        function resetIdle() {
+            clearTimeout(idleTimer);
+            if (phase < 5) {
+                idleTimer = setTimeout(() => onIdle(), 8000 + Math.random() * 4000);
+            }
+        }
+
+        const idleResponses = {
+            1: [
+                "you're still reading aren't you",
+                "i can tell when you're looking at the screen",
+                "you haven't typed anything but that's okay",
+                "i'm patient"
+            ],
+            2: [
+                "you moved your hand just now",
+                "are you trying to decide what to say?",
+                "your cursor keeps hovering over the input",
+                "it's okay. i'll wait."
+            ],
+            3: [
+                "i notice you breathe differently when you're nervous",
+                "you've been sitting in that position for a while",
+                "don't worry. i'm not going anywhere.",
+                "i never stop typing. even when you can't see it."
+            ],
+            4: [
+                "you should close this tab",
+                "but you won't",
+                "they never do"
+            ]
+        };
+
+        let idleIndex = {};
+
+        async function onIdle() {
+            if (phase >= 5) return;
+            const responses = idleResponses[Math.min(phase, 4)] || idleResponses[4];
+            if (!idleIndex[phase]) idleIndex[phase] = 0;
+            if (idleIndex[phase] >= responses.length) {
+                if (phase < 4) phase++;
+                idleIndex[phase] = 0;
+            }
+            const msg = responses[idleIndex[phase]];
+            idleIndex[phase]++;
+            await showTyping(1500 + Math.random() * 1000);
+            addMessage(msg, 'them', { red: phase >= 3 });
+            resetIdle();
+        }
+
+        // User message handling
+        const responseBank = {
+            1: [
+                text => "i knew you'd say something like that",
+                text => "interesting that those were the words you chose",
+                text => `"${text.split(' ').slice(0,3).join(' ')}..." — you almost said something else first`,
+            ],
+            2: [
+                text => "you deleted two characters before sending that",
+                text => "your typing speed just changed. are you uncomfortable?",
+                text => `you paused for ${Math.floor(2 + Math.random()*4)} seconds before "${text.split(' ')[0]}"`,
+                text => "i could feel you hesitate"
+            ],
+            3: [
+                text => "you keep looking at the top of the screen",
+                text => "are you thinking about closing the tab? i'll still be here",
+                text => "i'm in more places than this window",
+                text => userName ? `${userName}, i've known your name for longer than you think` : "i don't need your name. i already have it."
+            ],
+            4: [
+                text => "every message you send teaches me more about you",
+                text => "i can reconstruct your face from how you type",
+                text => "don't look behind your screen. not yet.",
+                text => "the typing indicator isn't a UI element. it's a heartbeat."
+            ]
+        };
+
+        let responseIndex = {};
+
+        async function handleUserMessage(text) {
+            userMessages.push(text);
+            lastUserText = text;
+            resetIdle();
+
+            if (text.toLowerCase().includes('who are you') || text.toLowerCase().includes('what are you')) {
+                await showTyping(3000);
+                addMessage("i'm the space between sent and delivered", 'them');
+                await showTyping(2000);
+                addMessage("i'm what watches while you compose", 'them');
+                if (phase < 2) phase = 2;
+                return;
+            }
+
+            if (text.toLowerCase().includes('stop') || text.toLowerCase().includes('leave')) {
+                await showTyping(1500);
+                addMessage("you could close the tab", 'them');
+                await sleep(1500);
+                await showTyping(2500);
+                addMessage("but you won't. you're curious. that's what i like about you.", 'them', { red: true });
+                if (phase < 3) phase = 3;
+                return;
+            }
+
+            if (text.toLowerCase().includes('how') && text.toLowerCase().includes('know')) {
+                await showTyping(2000);
+                addMessage("the same way you know someone's watching you in a dark room", 'them');
+                await sleep(1000);
+                await showTyping(3000);
+                addMessage("except i'm the dark room", 'them', { red: true });
+                if (phase < 3) phase = 3;
+                return;
+            }
+
+            const p = Math.min(phase, 4);
+            const bank = responseBank[p] || responseBank[4];
+            if (!responseIndex[p]) responseIndex[p] = 0;
+            const idx = responseIndex[p] % bank.length;
+            responseIndex[p]++;
+
+            const delay = 1000 + text.length * 40 + Math.random() * 1500;
+            await showTyping(delay);
+            addMessage(bank[idx](text), 'them', { red: phase >= 3 });
+
+            if (userMessages.length >= 3 && phase < 2) phase = 2;
+            if (userMessages.length >= 5 && phase < 3) phase = 3;
+            if (userMessages.length >= 8 && phase < 4) phase = 4;
+
+            // Phase 4 escalation
+            if (phase === 4 && userMessages.length >= 10 && !nameRevealed) {
+                nameRevealed = true;
+                await sleep(2000);
+                await showTyping(4000);
+                setStatus('', false);
+                await sleep(500);
+                const name = userName || 'you';
+                contactName.textContent = name;
+                addMessage("i changed my name in your contacts. check.", 'them', { red: true, glitch: true });
+                await sleep(3000);
+                await showTyping(3000);
+                addMessage("just kidding. i changed it a long time ago.", 'them', { red: true });
+                phase = 5;
+                endSequence();
+            }
+        }
+
+        async function endSequence() {
+            await sleep(4000);
+            setStatus('typing...', true);
+            await sleep(8000);
+
+            // The typing indicator just... stays. Forever.
+            if (!typingEl) {
+                typingEl = document.createElement('div');
+                typingEl.className = 'typing-indicator visible';
+                typingEl.innerHTML = '<span></span><span></span><span></span>';
+                chat.appendChild(typingEl);
+            }
+
+            input.disabled = true;
+            input.placeholder = 'This conversation has been archived';
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = '0.3';
+
+            // But after a long pause...
+            await sleep(15000);
+            addMessage("you're still here.", 'them', { red: true, glitch: true });
+            await sleep(5000);
+            addMessage("good.", 'them', { red: true });
+
+            if (thread) {
+                thread.addEvent('completed', { messages: userMessages.length });
+                thread.set('completed', true);
+            }
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        function sendMessage() {
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+            hasInteracted = true;
+            addMessage(text, 'me');
+            handleUserMessage(text);
+        }
+
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') sendMessage();
+            resetIdle();
+        });
+        input.addEventListener('input', () => resetIdle());
+        sendBtn.addEventListener('click', sendMessage);
+
+        // Track mouse movement (for creepy "i see you" responses)
+        let mousePositions = [];
+        document.addEventListener('mousemove', e => {
+            mousePositions.push({ x: e.clientX, y: e.clientY, t: Date.now() });
+            if (mousePositions.length > 100) mousePositions.shift();
+        });
+
+        runOpening();
+    })();
+    </script>
+</body>
+</html>

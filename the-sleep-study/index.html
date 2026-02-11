@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Sleep Study</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    background: #0a0a0a;
+    color: #c8c8c8;
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 2rem 1rem;
+    line-height: 1.7;
+  }
+  
+  #container {
+    max-width: 640px;
+    width: 100%;
+  }
+  
+  .header {
+    border-bottom: 1px solid #222;
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .header h1 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e8e8e8;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  
+  .header .sub {
+    font-size: 0.7rem;
+    color: #555;
+    margin-top: 0.3rem;
+  }
+  
+  .entry {
+    margin-bottom: 2rem;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: fadeIn 0.6s ease forwards;
+  }
+  
+  .entry .date {
+    font-size: 0.65rem;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+  }
+  
+  .entry p {
+    font-size: 0.82rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  .entry .note {
+    color: #666;
+    font-style: italic;
+    font-size: 0.75rem;
+    border-left: 2px solid #222;
+    padding-left: 0.8rem;
+    margin: 1rem 0;
+  }
+  
+  .choices {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  
+  .choices button {
+    background: transparent;
+    border: 1px solid #222;
+    color: #888;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.7rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .choices button:hover {
+    border-color: #555;
+    color: #ccc;
+    background: #111;
+  }
+  
+  .redacted {
+    background: #c8c8c8;
+    color: #c8c8c8;
+    padding: 0 0.2em;
+    cursor: pointer;
+    transition: all 0.5s ease;
+    user-select: none;
+  }
+  
+  .redacted.revealed {
+    background: transparent;
+    color: #ff3333;
+  }
+  
+  .corruption {
+    color: #333;
+    font-size: 0.7rem;
+    word-break: break-all;
+    line-height: 1.2;
+    margin: 0.5rem 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 1s ease;
+  }
+  
+  .corruption.visible {
+    max-height: 200px;
+  }
+  
+  .warning {
+    color: #aa2222;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  
+  .blink {
+    animation: blink 1.5s ease infinite;
+  }
+  
+  @keyframes fadeIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+  
+  .glitch {
+    animation: glitch 0.1s ease infinite;
+  }
+  
+  @keyframes glitch {
+    0% { transform: translate(0); }
+    25% { transform: translate(-1px, 1px); }
+    50% { transform: translate(1px, -1px); }
+    75% { transform: translate(-1px, -1px); }
+    100% { transform: translate(0); }
+  }
+  
+  #time-display {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    font-size: 0.6rem;
+    color: #333;
+  }
+  
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div id="time-display"></div>
+
+<div id="container">
+  <div class="header">
+    <h1>The Sleep Study</h1>
+    <div class="sub">Recovered correspondence — Subject 6 (F. Morrow)</div>
+  </div>
+  
+  <div id="story"></div>
+</div>
+
+<script>
+const story = document.getElementById('story');
+let state = { night: 0, awake: 0, looked: false, listened: false };
+
+// Update clock to always show 3:XX AM
+function updateClock() {
+  const min = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+  document.getElementById('time-display').textContent = `03:${min}`;
+}
+setInterval(updateClock, 30000);
+updateClock();
+
+function addEntry(html, delay = 0) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.style.animationDelay = '0s';
+      div.innerHTML = html;
+      story.appendChild(div);
+      
+      // Wire up redacted spans
+      div.querySelectorAll('.redacted').forEach(el => {
+        el.addEventListener('click', () => el.classList.add('revealed'));
+      });
+      
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      resolve(div);
+    }, delay);
+  });
+}
+
+function choose(options) {
+  const div = document.createElement('div');
+  div.className = 'choices';
+  options.forEach(([label, fn]) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      div.remove();
+      fn();
+    });
+    div.appendChild(btn);
+  });
+  story.appendChild(div);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+function corrupt(length = 200) {
+  const chars = 'THEYDON\'TSLEEPTHEYDON\'TSLEEPTHEYDON\'TSLEEP';
+  let s = '';
+  for (let i = 0; i < length; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+// === STORY BEGINS ===
+
+async function start() {
+  await addEntry(`
+    <div class="date">Day 1 — Intake Interview</div>
+    <p>Thank you for volunteering for the Langford Institute's sleep study. You'll spend 14 nights in our observation suite. The room is comfortable — bed, desk, reading lamp, bathroom. A camera records your sleep for analysis.</p>
+    <p>The compensation is $4,200. All you have to do is sleep.</p>
+    <div class="note">Researcher's note: Subject presents as well-adjusted. No prior history of sleep disorders. Ideal candidate.</div>
+  `, 300);
+  
+  await addEntry(`
+    <div class="date">Day 1 — 11:00 PM</div>
+    <p>The room is nicer than you expected. White walls, soft sheets, that specific silence of a building designed to contain sound. The camera's red light watches from the ceiling corner.</p>
+    <p>You lie down. It takes a while, but eventually you sleep.</p>
+  `, 800);
+  
+  await addEntry(`
+    <div class="date">Day 2 — Morning</div>
+    <p>You slept fine. A researcher named Dr. Chen reviews your data over breakfast. "Perfectly normal," she says, smiling. "How did the room feel?"</p>
+    <p>You tell her it was quiet. She writes something down.</p>
+  `, 600);
+  
+  nightTwo();
+}
+
+async function nightTwo() {
+  await addEntry(`
+    <div class="date">Day 2 — 2:47 AM</div>
+    <p>You wake up. Not from a dream — you just... wake up. The room is dark except for the camera's red eye.</p>
+    <p>There's a sound. Faint. Rhythmic. Like breathing that isn't yours.</p>
+    <p>It's probably the ventilation system.</p>
+  `, 500);
+  
+  choose([
+    ['Go back to sleep', () => goBackToSleep()],
+    ['Listen carefully', () => listenCarefully()],
+    ['Check under the bed', () => checkUnderBed()],
+  ]);
+}
+
+async function goBackToSleep() {
+  state.night++;
+  await addEntry(`
+    <div class="date">Day 2 — Morning</div>
+    <p>You mention the sound to Dr. Chen. She nods. "The HVAC is old. We get that complaint sometimes." She pauses. "Did you feel... watched?"</p>
+    <p>Strange question. You say no.</p>
+    <p>She writes something down. Her handwriting is very small.</p>
+  `, 500);
+  nightThree();
+}
+
+async function listenCarefully() {
+  state.listened = true;
+  state.night++;
+  await addEntry(`
+    <div class="date">Day 2 — 2:51 AM</div>
+    <p>You hold your breath and listen. The sound resolves into something more specific than ventilation. It has a cadence. A wetness to it.</p>
+    <p>It's coming from inside the wall behind your headboard.</p>
+    <p>You press your ear against the wall. The breathing stops. Immediately. Like it noticed.</p>
+    <p>The silence that follows is worse.</p>
+    <div class="note">Camera log: Subject placed ear against north wall at 02:51. Wall surface temperature registered 4°C above ambient. Noted.</div>
+  `, 500);
+  nightThree();
+}
+
+async function checkUnderBed() {
+  state.looked = true;
+  state.night++;
+  await addEntry(`
+    <div class="date">Day 2 — 2:52 AM</div>
+    <p>You lean over the edge and look under the bed. Nothing. Of course nothing. Just the clean floor and—</p>
+    <p>Your phone screen illuminates the space. In the far corner where the bed meets the wall, there are marks on the floor. Like something was dragged. Or like fingernails were drawn slowly across the surface, over and over, the way someone might do if they were very patient and had a very long time.</p>
+    <p>The marks look fresh.</p>
+    <div class="note">Maintenance log: Floor marks in Suite 6 reported by cleaning staff (again). Cause undetermined. Repainted 3x this year.</div>
+  `, 500);
+  nightThree();
+}
+
+async function nightThree() {
+  await addEntry(`
+    <div class="date">Day 4 — 3:12 AM</div>
+    <p>It happens again. You wake at almost the same time. The camera light is red. The room is dark.</p>
+    <p>This time you notice something you can't explain: the camera light blinks off for exactly two seconds. In those two seconds of total darkness, you feel a pressure change in the room. Like a door opened and closed. But the door is locked from outside.</p>
+    <p>When the light comes back on, the room looks the same.</p>
+    <p>But the air smells different. Faintly sweet. Like overripe fruit. Or—</p>
+    <p>You pull the covers up and wait for morning.</p>
+  `, 800);
+  
+  await addEntry(`
+    <div class="date">Day 5 — Breakfast</div>
+    <p>"Are there other subjects in adjacent rooms?" you ask Dr. Chen.</p>
+    <p>"No. Suite 6 is isolated. That's the point." She smiles, but today it doesn't reach her eyes. "Are you sleeping well?"</p>
+    <p>"I keep waking up at 3 AM."</p>
+    <p>She stops writing. Looks at you. Something moves behind her expression.</p>
+    <p>"That's... consistent with the others."</p>
+    <p>"Others?"</p>
+    <p>"Previous subjects. It's a known pattern with this room. Nothing to worry about."</p>
+  `, 600);
+  
+  choose([
+    ['Ask about the previous subjects', () => askAboutSubjects()],
+    ['"Nothing to worry about" — sure. Keep going.', () => keepGoing()],
+    ['Ask to switch rooms', () => askToSwitch()],
+  ]);
+}
+
+async function askAboutSubjects() {
+  await addEntry(`
+    <div class="date">Day 5 — Breakfast (continued)</div>
+    <p>"What happened to them? The other subjects?"</p>
+    <p>Dr. Chen sets down her pen. "They completed the study. Collected their payment. Left."</p>
+    <p>"All of them?"</p>
+    <p>"The ones who stayed." A pause. "Some left early. That's normal. The isolation can be difficult."</p>
+    <p>"How many left early?"</p>
+    <p>She doesn't answer. Instead, she opens a folder and slides a form across the table. It's your consent agreement. She points to a clause you don't remember reading:</p>
+    <p><em>"Subject acknowledges that Suite 6 has a unique acoustic and thermal profile that may produce unusual perceptual experiences during sleep stages N2-N3. These are expected and benign."</em></p>
+    <p>You definitely did not read that before signing.</p>
+    <div class="note">Personnel note: Dr. Chen requested transfer from Suite 6 observation duty on <span class="redacted">three separate occasions</span>. All denied.</div>
+  `, 500);
+  nightSeven();
+}
+
+async function keepGoing() {
+  await addEntry(`
+    <div class="date">Day 5 — Breakfast (continued)</div>
+    <p>You nod and eat your toast. $4,200 is $4,200. You can handle weird sounds and early wakeups for another nine days.</p>
+    <p>Dr. Chen watches you eat. She hasn't touched her own food.</p>
+    <p>"The next few nights may be more... vivid," she says quietly. "The room has a way of... settling in with people. If anything feels wrong — truly wrong — press the call button. Someone will come."</p>
+    <p>She hesitates.</p>
+    <p>"Quickly."</p>
+  `, 500);
+  nightSeven();
+}
+
+async function askToSwitch() {
+  await addEntry(`
+    <div class="date">Day 5 — Breakfast (continued)</div>
+    <p>"Can I switch to a different room?"</p>
+    <p>Dr. Chen's expression flickers. Relief? Disappointment?</p>
+    <p>"The study requires Suite 6 specifically. It's... the room we're studying. Not you." She catches herself. "I mean — the sleep patterns in that particular room. The acoustics. The architecture."</p>
+    <p>"You're studying the room?"</p>
+    <p>"We're studying sleep," she says firmly. "In that room." She gathers her papers. "If you want to withdraw, you can. No penalty. You'd receive partial compensation."</p>
+    <p>Something about the speed of that offer bothers you.</p>
+    <p>You tell her you'll stay.</p>
+    <p>She nods. Was that relief or pity?</p>
+  `, 500);
+  nightSeven();
+}
+
+async function nightSeven() {
+  await addEntry(`
+    <div class="date">Day 7 — 3:03 AM</div>
+    <p>You've started setting an alarm for 2:55 AM. If you're going to wake up anyway, you'd rather be ready.</p>
+    <p>At 3:03, the camera blinks off. Two seconds of dark.</p>
+    <p>This time you're watching. This time you see it.</p>
+    <p>In the far corner of the room, in the two seconds of darkness, there's a shape. Not moving. Just standing. Tall and thin and perfectly still, like it was always there and the light was the only thing hiding it.</p>
+    <p>The camera blinks back on. The corner is empty.</p>
+    <p>But on the wall where the shape stood, at about head height, there's condensation. Two small circles of fog on the cold wall. Like breath.</p>
+    <p>Like something was pressing its face against the wall from the other side, and the wall is thinner than you thought.</p>
+  `, 1000);
+  
+  const corruptText = corrupt(300);
+  await addEntry(`
+    <div class="corruption" id="corrupt1">${corruptText}</div>
+  `, 200);
+  setTimeout(() => document.getElementById('corrupt1')?.classList.add('visible'), 500);
+  
+  choose([
+    ['Press the call button', () => pressCallButton()],
+    ['Set up your phone to record the corner', () => recordCorner()],
+    ['Leave. Now. Forfeit the money.', () => tryToLeave()],
+  ]);
+}
+
+async function pressCallButton() {
+  await addEntry(`
+    <div class="date">Day 7 — 3:07 AM</div>
+    <p>You press the call button. The intercom crackles.</p>
+    <p>Silence. Then a voice — not Dr. Chen's. Deeper. Flatter.</p>
+    <p>"Please describe what you're experiencing."</p>
+    <p>"There was something in the corner. A shape. The camera went dark and—"</p>
+    <p>"The camera did not go dark. We're reviewing the feed now. It's continuous."</p>
+    <p>"I watched it blink off. Two seconds. I've been timing it—"</p>
+    <p>"Subject 6, the camera feed is continuous. There are no interruptions. What you experienced was a hypnagogic event consistent with stage N2 micro-sleep."</p>
+    <p>"I was awake. I set an alarm—"</p>
+    <p>"Return to bed. This is noted."</p>
+    <p>The intercom clicks off. You stare at the camera. Its red light is steady.</p>
+    <p>You check your phone. The alarm you set? It's gone. The alarm app shows no history of it ever being created.</p>
+  `, 500);
+  nightTen();
+}
+
+async function recordCorner() {
+  await addEntry(`
+    <div class="date">Day 7 — 3:15 AM</div>
+    <p>You prop your phone against the lamp, camera aimed at the corner. You set it to record and wait.</p>
+    <p>At 3:33 AM, the camera blinks again. Two seconds. In the darkness, you see the shape. Closer now. Not in the corner — in the middle of the room.</p>
+    <p>You don't breathe. The light returns. The room is empty.</p>
+    <p>You grab your phone. The recording is 18 minutes long. You scrub to 3:33.</p>
+    <p>The video shows the empty corner. No darkness. No blink. The room light never changes. But at 3:33:00, for exactly two seconds, the audio peaks. Your phone recorded a sound your ears didn't hear — a frequency so low it's almost below perception.</p>
+    <p>When you run it through a spectrum analyzer later, the waveform looks like a mouth opening.</p>
+    <div class="note">Dr. Chen's personal log (recovered): "Subject 6 is recording. Just like Subject 4. Should I intervene? I asked Dr. Harmon. He said to let the room decide. I don't know what that means. I don't think I want to."</div>
+  `, 500);
+  nightTen();
+}
+
+async function tryToLeave() {
+  await addEntry(`
+    <div class="date">Day 7 — 3:09 AM</div>
+    <p>You go to the door. It's locked from outside, but there's a release — they showed you during orientation. You press it.</p>
+    <p>Nothing happens.</p>
+    <p>You press it again. The mechanism clicks but the door doesn't move. Like something is holding it shut from the other side. Not locked — held.</p>
+    <p>You press the call button.</p>
+    <p>"I want to leave."</p>
+    <p>Silence. Then: "Withdrawal requests are processed during business hours. Please return to bed."</p>
+    <p>"The door won't open."</p>
+    <p>"The door is functioning normally. Return to bed, Subject 6."</p>
+    <p>You pull on the door handle. It's warm. Doors aren't warm at 3 AM.</p>
+    <p>Behind you, softly, from the corner of the room — a sound. Not breathing this time.</p>
+    <p>Laughter. Low and wet and delighted. Like something that's been waiting, and you just did exactly what it wanted.</p>
+  `, 500);
+  nightTen();
+}
+
+async function nightTen() {
+  await addEntry(`
+    <div class="date">Day 10 — Dr. Chen's Final Note</div>
+    <p class="warning">⚠ This document was recovered from Dr. Chen's personal files after her resignation.</p>
+    <p>"I'm writing this from home. I quit today. I can't do this anymore."</p>
+    <p>"Subject 6 is exhibiting the same pattern as all the others. Waking at 3 AM. Reporting a presence. Hearing the breathing. Finding the marks."</p>
+    <p>"Dr. Harmon says it's the architecture. Something about the room's dimensions creating a resonance frequency that induces parasomnia. That's the official explanation. That's what the paper will say."</p>
+    <p>"But I've watched the camera feeds. All of them. Every night, for every subject."</p>
+    <p>"The camera doesn't blink. The subjects are right about that."</p>
+    <p>"<em>The camera doesn't blink because it doesn't need to. It's not the camera that's going dark.</em>"</p>
+    <p>"It's the room. The room closes its eyes. For two seconds every night, the room looks away."</p>
+    <p>"And in those two seconds, something moves."</p>
+  `, 1200);
+  
+  await addEntry(`
+    <div class="date">Day 14 — Final Morning</div>
+    <p>You complete the study. You collect your $4,200. Dr. Harmon — not Dr. Chen, who you're told "moved on" — shakes your hand and asks you to sign an NDA.</p>
+    <p>You drive home. You sleep in your own bed.</p>
+    <p>At 3:03 AM, you wake up.</p>
+    <p>The room is dark. Your room. Your home. But the air has that smell — sweet and thick, like overripe fruit.</p>
+    <p>In the corner of your bedroom, something breathes.</p>
+    <p>And above you, on the ceiling, a small red light you've never seen before blinks off.</p>
+    <p>Two seconds.</p>
+  `, 1500);
+  
+  const finalCorrupt = corrupt(500);
+  await addEntry(`
+    <div class="corruption" id="corrupt2">${finalCorrupt}</div>
+    <p style="margin-top: 2rem; font-size: 0.65rem; color: #333; text-align: center;">
+      [ Suite 6 is currently accepting new volunteers. Compensation: $4,200. ]<br>
+      <span class="blink">[ Apply at langfordinstitute.org ]</span>
+    </p>
+  `, 800);
+  setTimeout(() => document.getElementById('corrupt2')?.classList.add('visible'), 1000);
+}
+
+// Begin
+start();
+</script>
+</body>
+</html>

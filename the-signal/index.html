@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Signal</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #c8b87a;
+  font-family: 'Courier New', monospace;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+.static-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(200,184,122,0.1) 2px,
+    rgba(200,184,122,0.1) 4px
+  );
+  animation: scan 8s linear infinite;
+  z-index: 10;
+}
+@keyframes scan {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(4px); }
+}
+.container {
+  text-align: center;
+  max-width: 600px;
+  padding: 2rem;
+}
+h1 {
+  font-size: 1.2rem;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  margin-bottom: 2rem;
+  opacity: 0.6;
+}
+.freq {
+  font-size: 3rem;
+  margin: 1rem 0;
+  font-weight: bold;
+  text-shadow: 0 0 20px rgba(200,184,122,0.3);
+}
+.freq-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  opacity: 0.4;
+  margin-bottom: 2rem;
+}
+#start-btn {
+  background: none;
+  border: 1px solid #c8b87a;
+  color: #c8b87a;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  padding: 0.8rem 2rem;
+  cursor: pointer;
+  letter-spacing: 0.2em;
+  transition: all 0.3s;
+}
+#start-btn:hover {
+  background: rgba(200,184,122,0.1);
+}
+#broadcast {
+  display: none;
+  text-align: center;
+}
+.numbers {
+  font-size: 2rem;
+  letter-spacing: 0.3em;
+  min-height: 3rem;
+  margin: 1.5rem 0;
+  font-weight: bold;
+}
+.transcript {
+  max-height: 40vh;
+  overflow-y: auto;
+  text-align: left;
+  padding: 1rem;
+  border: 1px solid rgba(200,184,122,0.1);
+  margin-top: 2rem;
+  font-size: 0.75rem;
+  line-height: 1.8;
+  opacity: 0.6;
+  scrollbar-width: none;
+}
+.transcript::-webkit-scrollbar { display: none; }
+.transcript .line { margin-bottom: 0.3rem; }
+.transcript .line.personal { color: #e84040; opacity: 1; }
+.transcript .line.warning { color: #e84040; animation: pulse 1s infinite; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.vu-meter {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  margin: 1rem 0;
+  height: 30px;
+  align-items: flex-end;
+}
+.vu-bar {
+  width: 4px;
+  background: #c8b87a;
+  transition: height 0.1s;
+  opacity: 0.6;
+}
+.status {
+  font-size: 0.65rem;
+  letter-spacing: 0.3em;
+  opacity: 0.3;
+  margin-top: 1rem;
+}
+</style>
+</head>
+<body>
+<div class="static-overlay"></div>
+<div class="container">
+  <div id="intro">
+    <h1>Shortwave Broadcast</h1>
+    <div class="freq">4625 kHz</div>
+    <div class="freq-label">Unknown Origin — Active Since 1982</div>
+    <button id="start-btn" onclick="startBroadcast()">TUNE IN</button>
+  </div>
+  <div id="broadcast">
+    <div class="freq" style="font-size:1.5rem;">4625 kHz — LIVE</div>
+    <div class="vu-meter" id="vu">
+    </div>
+    <div class="numbers" id="numbers"></div>
+    <div class="status" id="status">RECEIVING...</div>
+    <div class="transcript" id="transcript"></div>
+  </div>
+</div>
+
+<script>
+let audioCtx, gainNode, noiseNode, toneOsc;
+let broadcastPhase = 0;
+let lineCount = 0;
+const transcript = [];
+
+// Device fingerprint data (the creepy part)
+function getDeviceData() {
+  const d = new Date();
+  return {
+    screenW: screen.width,
+    screenH: screen.height,
+    colorDepth: screen.colorDepth,
+    tzOffset: d.getTimezoneOffset(),
+    cores: navigator.hardwareConcurrency || '?',
+    lang: navigator.language,
+    platform: navigator.platform,
+    hour: d.getHours(),
+    minute: d.getMinutes(),
+    touchPoints: navigator.maxTouchPoints,
+    memory: navigator.deviceMemory || '?',
+    downlink: navigator.connection ? navigator.connection.downlink : '?',
+    pixelRatio: window.devicePixelRatio,
+  };
+}
+
+function createNoise(ctx) {
+  const bufferSize = 2 * ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  const node = ctx.createBufferSource();
+  node.buffer = buffer;
+  node.loop = true;
+
+  // bandpass to sound like radio static
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 2000;
+  bp.Q.value = 0.5;
+
+  const gain = ctx.createGain();
+  gain.gain.value = 0.08;
+
+  node.connect(bp);
+  bp.connect(gain);
+  gain.connect(ctx.destination);
+  node.start();
+
+  // random crackle
+  setInterval(() => {
+    gain.gain.setValueAtTime(0.08 + Math.random() * 0.06, ctx.currentTime);
+    setTimeout(() => gain.gain.setValueAtTime(0.08, ctx.currentTime), 50 + Math.random() * 100);
+  }, 300 + Math.random() * 700);
+
+  return { node, gain };
+}
+
+function playTone(freq, duration, volume = 0.12) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + 0.02);
+  g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration + 0.1);
+}
+
+function playNumberTones(numStr) {
+  let delay = 0;
+  for (const ch of numStr) {
+    if (ch >= '0' && ch <= '9') {
+      const freq = 600 + parseInt(ch) * 80;
+      setTimeout(() => playTone(freq, 0.25, 0.1), delay);
+      delay += 350;
+    } else {
+      delay += 200;
+    }
+  }
+}
+
+// VU meter
+function initVU() {
+  const vu = document.getElementById('vu');
+  for (let i = 0; i < 24; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'vu-bar';
+    bar.style.height = '3px';
+    vu.appendChild(bar);
+  }
+  setInterval(() => {
+    const bars = vu.children;
+    for (let i = 0; i < bars.length; i++) {
+      const h = 3 + Math.random() * 25;
+      bars[i].style.height = h + 'px';
+      bars[i].style.opacity = 0.3 + (h / 28) * 0.7;
+    }
+  }, 100);
+}
+
+function addLine(text, cls = '') {
+  const el = document.getElementById('transcript');
+  const line = document.createElement('div');
+  line.className = 'line' + (cls ? ' ' + cls : '');
+  line.textContent = text;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  transcript.push(text);
+}
+
+function setNumbers(text) {
+  document.getElementById('numbers').textContent = text;
+}
+
+function randomNumbers(count) {
+  let s = '';
+  for (let i = 0; i < count; i++) {
+    s += Math.floor(Math.random() * 10);
+    if ((i + 1) % 5 === 0 && i < count - 1) s += '  ';
+  }
+  return s;
+}
+
+function setStatus(text) {
+  document.getElementById('status').textContent = text;
+}
+
+// Broadcast sequence
+const dd = getDeviceData();
+
+function getSequence() {
+  return [
+    // Phase 0-5: Normal numbers station
+    { delay: 2000, fn: () => { const n = randomNumbers(10); setNumbers(n); playNumberTones(n.replace(/\s/g,'')); addLine('[' + new Date().toLocaleTimeString() + '] ' + n); }},
+    { delay: 3500, fn: () => { const n = randomNumbers(10); setNumbers(n); playNumberTones(n.replace(/\s/g,'')); addLine('[' + new Date().toLocaleTimeString() + '] ' + n); }},
+    { delay: 3000, fn: () => { const n = randomNumbers(15); setNumbers(n); playNumberTones(n.replace(/\s/g,'')); addLine('[' + new Date().toLocaleTimeString() + '] ' + n); }},
+    { delay: 4000, fn: () => { addLine('— MARKER TONE —'); playTone(1200, 1.5, 0.15); setNumbers('— — —'); }},
+    { delay: 3500, fn: () => { const n = randomNumbers(10); setNumbers(n); playNumberTones(n.replace(/\s/g,'')); addLine('[' + new Date().toLocaleTimeString() + '] ' + n); }},
+    { delay: 3500, fn: () => { const n = randomNumbers(10); setNumbers(n); playNumberTones(n.replace(/\s/g,'')); addLine('[' + new Date().toLocaleTimeString() + '] ' + n); }},
+
+    // Phase 6: First anomaly — screen dimensions encoded
+    { delay: 4000, fn: () => {
+      playTone(800, 2, 0.15);
+      addLine('— PRIORITY BROADCAST —');
+      setStatus('PRIORITY SIGNAL DETECTED');
+    }},
+    { delay: 3000, fn: () => {
+      const n = dd.screenW + '  ' + dd.screenH;
+      setNumbers(n);
+      playNumberTones((dd.screenW+''+dd.screenH).replace(/\s/g,''));
+      addLine('[' + new Date().toLocaleTimeString() + '] ' + n);
+    }},
+    { delay: 2500, fn: () => {
+      addLine('RESOLUTION: ' + dd.screenW + ' × ' + dd.screenH, 'personal');
+      setStatus('DEVICE IDENTIFIED');
+    }},
+
+    // More normal-seeming numbers
+    { delay: 3500, fn: () => { const n = randomNumbers(10); setNumbers(n); playNumberTones(n.replace(/\s/g,'')); addLine('[' + new Date().toLocaleTimeString() + '] ' + n); }},
+
+    // Timezone offset
+    { delay: 3000, fn: () => {
+      const tz = Math.abs(dd.tzOffset);
+      const n = '' + tz;
+      setNumbers(n);
+      playNumberTones(n);
+      addLine('[' + new Date().toLocaleTimeString() + '] ' + n);
+    }},
+    { delay: 2000, fn: () => {
+      const hrs = -(dd.tzOffset / 60);
+      addLine('UTC OFFSET: ' + (hrs >= 0 ? '+' : '') + hrs + ':00', 'personal');
+    }},
+
+    // CPU cores
+    { delay: 3500, fn: () => {
+      const n = '' + dd.cores;
+      setNumbers(n);
+      playNumberTones(n);
+      addLine('[' + new Date().toLocaleTimeString() + '] ' + n);
+    }},
+    { delay: 2000, fn: () => {
+      addLine('CORES: ' + dd.cores, 'personal');
+      setStatus('HARDWARE PROFILED');
+    }},
+
+    // Interlude
+    { delay: 4000, fn: () => { addLine('— MARKER TONE —'); playTone(1200, 1.5, 0.15); setNumbers('— — —'); }},
+    { delay: 3500, fn: () => { const n = randomNumbers(15); setNumbers(n); playNumberTones(n.replace(/\s/g,'')); addLine('[' + new Date().toLocaleTimeString() + '] ' + n); }},
+
+    // Language
+    { delay: 3000, fn: () => {
+      setNumbers(dd.lang.toUpperCase());
+      addLine('LANGUAGE: ' + dd.lang, 'personal');
+    }},
+
+    // Platform
+    { delay: 3000, fn: () => {
+      setNumbers(dd.platform);
+      addLine('PLATFORM: ' + dd.platform, 'personal');
+      setStatus('OPERATOR LOCATED');
+    }},
+
+    // Pixel ratio + touch
+    { delay: 3500, fn: () => {
+      const n = dd.pixelRatio + '  ' + dd.touchPoints;
+      setNumbers(n);
+      addLine('PIXEL RATIO: ' + dd.pixelRatio + ' / TOUCH POINTS: ' + dd.touchPoints, 'personal');
+    }},
+
+    // Memory
+    { delay: 3000, fn: () => {
+      if (dd.memory !== '?') {
+        setNumbers(dd.memory + ' GB');
+        addLine('DEVICE MEMORY: ' + dd.memory + ' GB', 'personal');
+      } else {
+        const n = randomNumbers(10); setNumbers(n); addLine('[' + new Date().toLocaleTimeString() + '] ' + n);
+      }
+    }},
+
+    // The turn
+    { delay: 4000, fn: () => {
+      playTone(400, 3, 0.18);
+      setNumbers('');
+      addLine('');
+      addLine('— END NUMBERED SEQUENCE —');
+      addLine('— VOICE MESSAGE FOLLOWS —');
+      setStatus('VOICE CHANNEL OPEN');
+    }},
+    { delay: 4000, fn: () => {
+      addLine('');
+      addLine('WE KNOW THIS DEVICE.', 'warning');
+    }},
+    { delay: 3000, fn: () => {
+      addLine('WE HAVE BEEN BROADCASTING TO IT FOR SOME TIME.', 'warning');
+    }},
+    { delay: 3500, fn: () => {
+      addLine('THE SIGNAL WAS ALWAYS THERE.', 'warning');
+    }},
+    { delay: 3000, fn: () => {
+      addLine('YOU JUST CHOSE TO LISTEN.', 'warning');
+    }},
+    { delay: 4000, fn: () => {
+      const now = new Date();
+      addLine('');
+      addLine('TIMESTAMP: ' + now.toLocaleDateString() + ' ' + now.toLocaleTimeString(), 'personal');
+      addLine('THIS BROADCAST WAS GENERATED FOR ONE RECIPIENT.', 'warning');
+      setNumbers('FOR YOU');
+      setStatus('BROADCAST LOCKED TO DEVICE');
+    }},
+    { delay: 5000, fn: () => {
+      addLine('');
+      addLine('DO NOT CLOSE THIS TAB.', 'warning');
+      addLine('WE WILL KNOW.', 'warning');
+      playTone(200, 5, 0.2);
+    }},
+    { delay: 6000, fn: () => {
+      setNumbers('4625 kHz');
+      setStatus('SIGNAL CONTINUES...');
+      // Loop random numbers forever
+      loopForever();
+    }},
+  ];
+}
+
+function loopForever() {
+  setInterval(() => {
+    const n = randomNumbers(10);
+    setNumbers(n);
+    playNumberTones(n.replace(/\s/g,''));
+    addLine('[' + new Date().toLocaleTimeString() + '] ' + n);
+  }, 4000);
+}
+
+let sequence;
+function runSequence(i) {
+  if (i >= sequence.length) return;
+  sequence[i].fn();
+  if (i + 1 < sequence.length) {
+    setTimeout(() => runSequence(i + 1), sequence[i + 1].delay);
+  }
+}
+
+function startBroadcast() {
+  document.getElementById('intro').style.display = 'none';
+  document.getElementById('broadcast').style.display = 'block';
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  createNoise(audioCtx);
+  initVU();
+
+  sequence = getSequence();
+  setTimeout(() => runSequence(0), 1500);
+
+  // Store visit
+  const visits = parseInt(localStorage.getItem('signal_visits') || '0') + 1;
+  localStorage.setItem('signal_visits', visits);
+  if (visits > 1) {
+    setTimeout(() => {
+      addLine('');
+      addLine('RETURN VISIT #' + visits + ' LOGGED.', 'personal');
+    }, sequence.reduce((a, s) => a + s.delay, 0) - 10000);
+  }
+}
+
+// If they try to leave
+window.addEventListener('beforeunload', (e) => {
+  if (audioCtx) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+</script>
+</body>
+</html>

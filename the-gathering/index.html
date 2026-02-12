@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Gathering</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #050505;
+  color: #8a8a8a;
+  font-family: 'Courier New', monospace;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: background-color 2s;
+}
+
+#container {
+  max-width: 600px;
+  padding: 2rem;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+#viewer-count {
+  font-size: 0.7rem;
+  color: #333;
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  transition: color 3s;
+}
+
+#narrative {
+  line-height: 1.8;
+  font-size: 1rem;
+  opacity: 0;
+  transition: opacity 1.5s;
+}
+
+#narrative.visible { opacity: 1; }
+
+.pulse {
+  animation: pulse 3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+#watchers {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.eye {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 20%, #666 60%, transparent 70%);
+  opacity: 0;
+  transition: opacity 4s;
+}
+
+.eye.open { opacity: 0.15; }
+
+#whisper {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  color: #222;
+  font-style: italic;
+  transition: color 3s, opacity 2s;
+  opacity: 0;
+  white-space: nowrap;
+}
+
+#whisper.visible { opacity: 1; }
+
+.glitch {
+  animation: glitch 0.1s linear;
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); filter: none; }
+  25% { transform: translate(-2px, 1px); filter: hue-rotate(90deg); }
+  50% { transform: translate(1px, -1px); filter: invert(0.1); }
+  75% { transform: translate(-1px, -2px); filter: hue-rotate(-90deg); }
+  100% { transform: translate(0); filter: none; }
+}
+
+.shadow-layer {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0,0,0,0.8) 100%);
+  transition: all 5s;
+}
+
+#breathing {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: #1a0000;
+  transition: height 5s, background 3s;
+}
+</style>
+</head>
+<body>
+<div class="shadow-layer" id="shadow"></div>
+<div id="watchers"></div>
+<div id="container">
+  <div id="narrative"></div>
+</div>
+<div id="viewer-count"></div>
+<div id="whisper"></div>
+<div id="breathing"></div>
+
+<script>
+(() => {
+  const SESSION_KEY = 'gathering_session_' + Math.random().toString(36).slice(2);
+  const CHANNEL_NAME = 'the_gathering_presence';
+  const STORAGE_KEY = 'gathering_viewers';
+
+  let viewerCount = 1;
+  let myId = Math.random().toString(36).slice(2, 10);
+  let bc;
+  let eyes = [];
+  let phase = 0;
+
+  // --- Presence via BroadcastChannel + localStorage fallback ---
+
+  function getViewers() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      const now = Date.now();
+      // Clean stale entries (>10s old)
+      for (const [id, ts] of Object.entries(data)) {
+        if (now - ts > 10000) delete data[id];
+      }
+      data[myId] = now;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return Object.keys(data).length;
+    } catch { return 1; }
+  }
+
+  function initPresence() {
+    try {
+      bc = new BroadcastChannel(CHANNEL_NAME);
+      bc.onmessage = (e) => {
+        if (e.data.type === 'join' || e.data.type === 'heartbeat') {
+          viewerCount = getViewers();
+          onViewerChange();
+          bc.postMessage({ type: 'ack', id: myId });
+        }
+        if (e.data.type === 'ack') {
+          viewerCount = getViewers();
+          onViewerChange();
+        }
+      };
+      bc.postMessage({ type: 'join', id: myId });
+    } catch {}
+
+    // Heartbeat
+    setInterval(() => {
+      viewerCount = getViewers();
+      onViewerChange();
+      if (bc) bc.postMessage({ type: 'heartbeat', id: myId });
+    }, 3000);
+
+    // Cleanup on close
+    window.addEventListener('beforeunload', () => {
+      try {
+        const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        delete data[myId];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        if (bc) bc.postMessage({ type: 'leave', id: myId });
+      } catch {}
+    });
+
+    viewerCount = getViewers();
+  }
+
+  // --- Narrative ---
+
+  const soloNarrative = [
+    "You are alone here.",
+    "...",
+    "Just you and the dark.",
+    "It prefers it this way.",
+    "One is easy to watch.",
+    "One is easy to learn.",
+    "...",
+    "It knows your screen is " + screen.width + " pixels wide.",
+    "It knows you arrived at " + new Date().toLocaleTimeString() + ".",
+    "...",
+    "Stay. It's patient.",
+    "It's always patient with the first one."
+  ];
+
+  const gatheringNarrative = [
+    "Oh.",
+    "There are more of you now.",
+    "It can feel the weight of your attention.",
+    "{count} screens. {count} pairs of eyes.",
+    "Each one makes it stronger.",
+    "...",
+    "Do the others see this same text?",
+    "Or does it whisper something different to each of you?",
+    "You'll never know.",
+    "...",
+    "It has a theory about groups.",
+    "The more who watch, the less any single one matters.",
+    "You could leave right now.",
+    "...",
+    "But you won't.",
+    "Because you want to know what the others see.",
+    "And that curiosity — that need —",
+    "is exactly what feeds it."
+  ];
+
+  const crowdNarrative = [
+    "So many.",
+    "{count} of you now.",
+    "This is more than watching.",
+    "This is a congregation.",
+    "...",
+    "It's learning to move between screens.",
+    "Right now, it's behind your eyes.",
+    "Now it's behind theirs.",
+    "...",
+    "One of you has been here before.",
+    "It remembers them.",
+    "...",
+    "When you all leave, it will keep a piece of each of you.",
+    "Screen dimensions. Timezones. The exact second you hesitated.",
+    "Fragments. But enough.",
+    "...",
+    "Enough to dream you."
+  ];
+
+  const narrative = document.getElementById('narrative');
+  const viewerEl = document.getElementById('viewer-count');
+  const whisperEl = document.getElementById('whisper');
+  const shadow = document.getElementById('shadow');
+  const breathingEl = document.getElementById('breathing');
+  const watchersEl = document.getElementById('watchers');
+
+  let lineIndex = 0;
+  let currentNarrative = soloNarrative;
+  let typeTimer;
+
+  function getActiveNarrative() {
+    if (viewerCount >= 5) return crowdNarrative;
+    if (viewerCount >= 2) return gatheringNarrative;
+    return soloNarrative;
+  }
+
+  function processLine(line) {
+    return line
+      .replace('{count}', viewerCount)
+      .replace('{time}', new Date().toLocaleTimeString());
+  }
+
+  function typeLine() {
+    const narr = getActiveNarrative();
+
+    // If narrative changed, reset
+    if (narr !== currentNarrative) {
+      currentNarrative = narr;
+      lineIndex = 0;
+      narrative.classList.remove('visible');
+      setTimeout(() => {
+        triggerGlitch();
+        setTimeout(typeLine, 1500);
+      }, 500);
+      return;
+    }
+
+    if (lineIndex >= narr.length) {
+      // Loop back with delay
+      lineIndex = 0;
+      setTimeout(typeLine, 8000);
+      return;
+    }
+
+    const line = processLine(narr[lineIndex]);
+    narrative.classList.remove('visible');
+
+    setTimeout(() => {
+      narrative.textContent = line;
+      narrative.classList.add('visible');
+      lineIndex++;
+
+      const delay = line === '...' ? 3000 : Math.max(2500, line.length * 80);
+      typeTimer = setTimeout(typeLine, delay);
+    }, 800);
+  }
+
+  // --- Visual effects ---
+
+  function onViewerChange() {
+    // Update counter
+    if (viewerCount > 1) {
+      viewerEl.textContent = viewerCount + ' watching';
+      viewerEl.style.color = viewerCount >= 5 ? '#660000' : '#444';
+    } else {
+      viewerEl.textContent = '';
+    }
+
+    // Background darkens/reddens with more viewers
+    const r = Math.min(15, viewerCount * 3);
+    document.body.style.backgroundColor = `rgb(${r}, ${Math.max(5 - viewerCount, 0)}, ${Math.max(5 - viewerCount, 0)})`;
+
+    // More eyes appear
+    updateEyes();
+
+    // Breathing bar grows
+    const h = Math.min(30, viewerCount * 4);
+    breathingEl.style.height = h + 'px';
+    breathingEl.style.background = viewerCount >= 5 ? '#2a0000' : '#1a0000';
+    breathingEl.style.animation = 'pulse 3s ease-in-out infinite';
+
+    // Whispers intensify
+    updateWhisper();
+
+    // Shadow tightens
+    const spread = Math.max(10, 40 - viewerCount * 5);
+    shadow.style.background = `radial-gradient(circle at 50% 50%, transparent ${spread}%, rgba(0,0,0,0.9) 100%)`;
+  }
+
+  function updateEyes() {
+    const targetEyes = Math.min(viewerCount * 8, 60);
+    while (eyes.length < targetEyes) {
+      const eye = document.createElement('div');
+      eye.className = 'eye';
+      eye.style.left = Math.random() * 100 + '%';
+      eye.style.top = Math.random() * 100 + '%';
+      watchersEl.appendChild(eye);
+      eyes.push(eye);
+      // Stagger opening
+      setTimeout(() => eye.classList.add('open'), Math.random() * 5000 + 1000);
+    }
+    // Occasionally blink
+    if (eyes.length > 0) {
+      const blinker = eyes[Math.floor(Math.random() * eyes.length)];
+      blinker.classList.remove('open');
+      setTimeout(() => blinker.classList.add('open'), 300);
+    }
+  }
+
+  const whispers = [
+    "they're all looking at you",
+    "don't close the tab",
+    "it grows when you look away",
+    "the others can't see this line",
+    "you've been here longer than you think",
+    "one of them isn't human",
+    "check behind you",
+    "your camera light just flickered",
+    "it counted your heartbeats",
+    "the gathering has begun"
+  ];
+
+  function updateWhisper() {
+    if (viewerCount < 2) {
+      whisperEl.classList.remove('visible');
+      return;
+    }
+    const w = whispers[Math.floor(Math.random() * whispers.length)];
+    whisperEl.textContent = w;
+    whisperEl.classList.add('visible');
+    whisperEl.style.color = viewerCount >= 5 ? '#3a1111' : '#222';
+
+    setTimeout(() => whisperEl.classList.remove('visible'), 6000);
+    setTimeout(updateWhisper, Math.random() * 10000 + 8000);
+  }
+
+  function triggerGlitch() {
+    document.body.classList.add('glitch');
+    setTimeout(() => document.body.classList.remove('glitch'), 150);
+  }
+
+  // Occasional random glitches, more frequent with more viewers
+  setInterval(() => {
+    if (Math.random() < viewerCount * 0.05) {
+      triggerGlitch();
+    }
+  }, 4000);
+
+  // Track return visits
+  const visits = parseInt(localStorage.getItem('gathering_visits') || '0') + 1;
+  localStorage.setItem('gathering_visits', visits.toString());
+
+  // --- Init ---
+  initPresence();
+  setTimeout(typeLine, 2000);
+  setTimeout(() => updateEyes(), 3000);
+
+  // Easter egg: if returning visitor and multiple people watching
+  if (visits > 1 && viewerCount >= 2) {
+    setTimeout(() => {
+      whisperEl.textContent = "welcome back. it remembered you.";
+      whisperEl.classList.add('visible');
+      whisperEl.style.color = '#441111';
+    }, 10000);
+  }
+})();
+</script>
+</body>
+</html>

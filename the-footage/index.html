@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Footage</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #000;
+  color: #8a8a8a;
+  font-family: 'Courier New', monospace;
+  height: 100vh;
+  overflow: hidden;
+  cursor: default;
+}
+
+#camera-prompt {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  background: #000;
+  padding: 20px;
+  text-align: center;
+}
+
+#camera-prompt p {
+  max-width: 400px;
+  line-height: 1.8;
+  margin-bottom: 30px;
+  font-size: 14px;
+}
+
+#camera-prompt .blink {
+  animation: blink 1.2s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+#enable-btn {
+  background: none;
+  border: 1px solid #333;
+  color: #666;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 10px 30px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.3s;
+}
+
+#enable-btn:hover {
+  border-color: #880000;
+  color: #aa0000;
+}
+
+#denied-msg {
+  display: none;
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #000;
+  z-index: 200;
+  padding: 40px;
+  text-align: center;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#denied-msg p {
+  max-width: 500px;
+  line-height: 2;
+  color: #555;
+}
+
+video {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  transform: scaleX(-1);
+  z-index: 1;
+}
+
+#overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.vhs-lines {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 11;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0) 0px,
+    rgba(0,0,0,0) 1px,
+    rgba(0,0,0,0.15) 1px,
+    rgba(0,0,0,0.15) 2px
+  );
+}
+
+.timestamp {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 20;
+  font-size: 16px;
+  color: #cc0000;
+  text-shadow: 0 0 8px rgba(200,0,0,0.5);
+  font-family: 'Courier New', monospace;
+  pointer-events: none;
+}
+
+.rec-indicator {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 20;
+  font-size: 14px;
+  color: #cc0000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #cc0000;
+  animation: rec-blink 1s step-end infinite;
+}
+
+@keyframes rec-blink {
+  50% { opacity: 0; }
+}
+
+.caption {
+  position: fixed;
+  bottom: 60px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 20;
+  font-size: 15px;
+  color: #ccc;
+  text-shadow: 1px 1px 4px #000, 0 0 10px rgba(0,0,0,0.8);
+  padding: 0 30px;
+  line-height: 1.8;
+  opacity: 0;
+  transition: opacity 0.8s;
+  pointer-events: none;
+}
+
+.caption.visible { opacity: 1; }
+.caption.visible.fade { opacity: 0; }
+
+.glitch-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: rgba(200,0,0,0.15);
+  z-index: 15;
+  pointer-events: none;
+}
+
+.static-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="%23111"/><rect x="0" y="0" width="1" height="1" fill="%23222"/><rect x="2" y="2" width="1" height="1" fill="%23333"/><rect x="1" y="3" width="1" height="1" fill="%23191919"/></svg>');
+  mix-blend-mode: overlay;
+  transition: opacity 0.1s;
+}
+
+.face-box {
+  position: fixed;
+  border: 1px solid rgba(200,0,0,0.4);
+  z-index: 18;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.face-box.visible { opacity: 1; }
+
+.face-box::after {
+  content: 'SUBJECT DETECTED';
+  position: absolute;
+  bottom: -20px;
+  left: 0;
+  font-size: 10px;
+  color: rgba(200,0,0,0.6);
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+.corruption {
+  position: fixed;
+  z-index: 25;
+  pointer-events: none;
+  color: #cc0000;
+  font-size: 11px;
+  opacity: 0;
+  letter-spacing: 3px;
+}
+
+#final-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #000;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+#final-screen p {
+  max-width: 500px;
+  line-height: 2.2;
+  color: #555;
+  font-size: 13px;
+}
+
+#final-screen .red {
+  color: #880000;
+}
+</style>
+</head>
+<body>
+
+<div id="camera-prompt">
+  <p>
+    RECOVERED FILE — CAM_FEED_0217.DAT<br><br>
+    This file requires camera access to reconstruct.<br><br>
+    <span style="color:#555">The original recording was made on a device like yours.</span><br>
+    <span style="color:#444">To view it, we need to calibrate to your camera.</span>
+  </p>
+  <button id="enable-btn">RECONSTRUCT<span class="blink">_</span></button>
+</div>
+
+<div id="denied-msg">
+  <p>
+    CAMERA ACCESS DENIED<br><br>
+    The file cannot be reconstructed without a camera feed.<br><br>
+    <span style="color:#444">That's probably for the best.</span><br><br>
+    <span style="color:#333">The last person who watched this<br>said they saw something behind them<br>that wasn't there when they turned around.</span>
+  </p>
+</div>
+
+<video id="feed" autoplay playsinline></video>
+<div class="vhs-lines"></div>
+<div class="static-overlay" id="static"></div>
+<div id="overlay"></div>
+
+<div class="rec-indicator" id="rec" style="display:none">
+  <div class="rec-dot"></div>
+  <span>REC</span>
+</div>
+
+<div class="timestamp" id="ts" style="display:none"></div>
+<div class="caption" id="caption"></div>
+<div class="face-box" id="face-box"></div>
+<div id="final-screen"></div>
+
+<script>
+const captions = [
+  { time: 3000, text: "Calibrating feed...", dur: 3000 },
+  { time: 7000, text: "Camera matched. Reconstructing file.", dur: 3000 },
+  { time: 12000, text: "FILE DATE: 02/14/2024", dur: 3000 },
+  { time: 17000, text: "RECOVERED FROM: [DEVICE NOT FOUND]", dur: 3500 },
+  { time: 23000, text: "The subject in the original footage sat exactly where you are.", dur: 5000 },
+  { time: 31000, text: "They were also watching their own camera feed.", dur: 4000 },
+  { time: 38000, text: "At 3:41 AM, the recording shows something behind them.", dur: 5000 },
+  { time: 46000, text: "They didn't notice at first.", dur: 3500 },
+  { time: 53000, text: "It's reconstructing that part now.", dur: 3000 },
+  { time: 60000, text: "Look at your feed carefully.", dur: 3000 },
+  { time: 67000, text: "Do you see it?", dur: 4000 },
+  { time: 75000, text: "It's standing just outside the frame.", dur: 4000 },
+  { time: 83000, text: "The original subject turned around at this point.", dur: 4000 },
+  { time: 90000, text: "The recording stopped 4 seconds later.", dur: 4000 },
+  { time: 98000, text: "Don't turn around.", dur: 5000 },
+  { time: 108000, text: "The file ends here.", dur: 3000 },
+  { time: 115000, text: "FEED TERMINATED", dur: 0 }
+];
+
+const glitchTexts = [
+  "IT SEES YOU", "DON'T MOVE", "STILL RECORDING", "BEHIND YOU",
+  "YOU LOOK LIKE THEM", "NOT ALONE", "FEED ACTIVE", "CAN YOU HEAR IT",
+  "THE CAMERA REMEMBERS", "IT WAS NEVER A FILE"
+];
+
+let stream = null;
+let startTime = null;
+let captionIdx = 0;
+let degradeLevel = 0;
+let ended = false;
+
+const feed = document.getElementById('feed');
+const caption = document.getElementById('caption');
+const ts = document.getElementById('ts');
+const rec = document.getElementById('rec');
+const stat = document.getElementById('static');
+const faceBox = document.getElementById('face-box');
+const finalScreen = document.getElementById('final-screen');
+
+document.getElementById('enable-btn').addEventListener('click', async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    feed.srcObject = stream;
+    document.getElementById('camera-prompt').style.display = 'none';
+    startExperience();
+  } catch(e) {
+    document.getElementById('camera-prompt').style.display = 'none';
+    const d = document.getElementById('denied-msg');
+    d.style.display = 'flex';
+  }
+});
+
+function startExperience() {
+  startTime = Date.now();
+  rec.style.display = 'flex';
+  ts.style.display = 'block';
+
+  // Fake VHS timestamp
+  updateTimestamp();
+  setInterval(updateTimestamp, 1000);
+
+  // Caption sequencer
+  requestAnimationFrame(tick);
+
+  // Periodic glitches
+  scheduleGlitch();
+
+  // Degrade over time
+  setInterval(() => {
+    degradeLevel = Math.min(1, (Date.now() - startTime) / 120000);
+    applyDegradation();
+  }, 500);
+
+  // Face box flickers
+  setTimeout(() => {
+    setInterval(flickerFaceBox, 8000 + Math.random() * 12000);
+  }, 30000);
+}
+
+function updateTimestamp() {
+  if (ended) return;
+  const fakeDate = new Date('2024-02-14T03:41:00');
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  fakeDate.setSeconds(fakeDate.getSeconds() + elapsed);
+  const h = String(fakeDate.getHours()).padStart(2,'0');
+  const m = String(fakeDate.getMinutes()).padStart(2,'0');
+  const s = String(fakeDate.getSeconds()).padStart(2,'0');
+  ts.textContent = `02/14/2024  ${h}:${m}:${s}`;
+}
+
+function tick() {
+  if (ended) return;
+  const elapsed = Date.now() - startTime;
+
+  while (captionIdx < captions.length && elapsed >= captions[captionIdx].time) {
+    showCaption(captions[captionIdx]);
+    captionIdx++;
+  }
+
+  if (captionIdx >= captions.length && !ended) {
+    endExperience();
+    return;
+  }
+
+  requestAnimationFrame(tick);
+}
+
+function showCaption(c) {
+  caption.textContent = c.text;
+  caption.classList.add('visible');
+  caption.classList.remove('fade');
+
+  if (c.dur > 0) {
+    setTimeout(() => {
+      caption.classList.add('fade');
+      setTimeout(() => {
+        caption.classList.remove('visible', 'fade');
+      }, 800);
+    }, c.dur);
+  }
+
+  // More glitches on scary captions
+  if (c.text.includes('behind') || c.text.includes('Don\'t turn') || c.text.includes('see it')) {
+    triggerGlitch();
+    triggerGlitch();
+  }
+}
+
+function scheduleGlitch() {
+  if (ended) return;
+  const baseInterval = 6000;
+  const interval = baseInterval - (degradeLevel * 4000) + Math.random() * 3000;
+  setTimeout(() => {
+    triggerGlitch();
+    scheduleGlitch();
+  }, Math.max(800, interval));
+}
+
+function triggerGlitch() {
+  // Static flash
+  stat.style.opacity = 0.15 + degradeLevel * 0.3;
+  setTimeout(() => { stat.style.opacity = 0; }, 50 + Math.random() * 100);
+
+  // Horizontal tear
+  const bar = document.createElement('div');
+  bar.className = 'glitch-bar';
+  bar.style.top = Math.random() * 100 + 'vh';
+  bar.style.height = (2 + Math.random() * 20 * degradeLevel) + 'px';
+  document.body.appendChild(bar);
+  setTimeout(() => bar.remove(), 80 + Math.random() * 120);
+
+  // Corruption text (more frequent as degrades)
+  if (Math.random() < 0.3 + degradeLevel * 0.3) {
+    const corr = document.createElement('div');
+    corr.className = 'corruption';
+    corr.textContent = glitchTexts[Math.floor(Math.random() * glitchTexts.length)];
+    corr.style.top = Math.random() * 90 + 5 + 'vh';
+    corr.style.left = Math.random() * 70 + 5 + 'vw';
+    corr.style.opacity = 0.4 + degradeLevel * 0.4;
+    corr.style.transform = `rotate(${(Math.random()-0.5)*8}deg)`;
+    document.body.appendChild(corr);
+    setTimeout(() => corr.remove(), 200 + Math.random() * 600);
+  }
+
+  // Feed displacement
+  if (degradeLevel > 0.3) {
+    const shift = (Math.random() - 0.5) * degradeLevel * 20;
+    feed.style.transform = `scaleX(-1) translateX(${shift}px)`;
+    setTimeout(() => {
+      feed.style.transform = 'scaleX(-1)';
+    }, 60);
+  }
+}
+
+function flickerFaceBox() {
+  if (ended) return;
+  const w = 80 + Math.random() * 100;
+  const h = w * 1.3;
+  // Position roughly center-ish but offset
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  faceBox.style.width = w + 'px';
+  faceBox.style.height = h + 'px';
+  faceBox.style.left = (cx - w/2 + (Math.random()-0.5)*100) + 'px';
+  faceBox.style.top = (cy - h/2 - 60 + (Math.random()-0.5)*60) + 'px';
+  faceBox.classList.add('visible');
+
+  // Change label sometimes
+  if (Math.random() < 0.3 + degradeLevel * 0.4) {
+    faceBox.style.setProperty('--label',
+      Math.random() < 0.5 ? '"UNKNOWN SUBJECT"' : '"SUBJECT 2 DETECTED"');
+    const style = document.createElement('style');
+    const label = Math.random() < 0.5 ? 'UNKNOWN SUBJECT' : 'SECOND SUBJECT DETECTED';
+    style.textContent = `.face-box.visible::after { content: '${label}'; }`;
+    document.head.appendChild(style);
+    setTimeout(() => style.remove(), 3000);
+  }
+
+  setTimeout(() => {
+    faceBox.classList.remove('visible');
+  }, 800 + Math.random() * 2000);
+}
+
+function applyDegradation() {
+  // Increase noise, desaturation, scan lines
+  const hue = degradeLevel * 10;
+  const sat = 1 - degradeLevel * 0.6;
+  const contrast = 1 + degradeLevel * 0.3;
+  const brightness = 1 - degradeLevel * 0.2;
+  feed.style.filter = `
+    saturate(${sat})
+    contrast(${contrast})
+    brightness(${brightness})
+    hue-rotate(${hue}deg)
+  `;
+}
+
+function endExperience() {
+  ended = true;
+
+  // Heavy static
+  stat.style.opacity = 0.8;
+  feed.style.filter = 'saturate(0) contrast(2) brightness(0.3)';
+
+  setTimeout(() => {
+    // Kill feed
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    feed.style.display = 'none';
+    stat.style.opacity = 0;
+    rec.style.display = 'none';
+    ts.style.display = 'none';
+    caption.classList.remove('visible');
+
+    finalScreen.style.display = 'flex';
+    finalScreen.innerHTML = `
+      <p>
+        FILE RECONSTRUCTION COMPLETE<br><br>
+        <span class="red">The original device was never recovered.</span><br><br>
+        The camera feed you just watched was yours.<br><br>
+        <span style="color:#333">There was no recovered file.</span><br><br>
+        <span style="color:#333">But the face detection found two subjects.</span><br><br>
+        <span style="color:#222; font-size: 11px">
+          ${localStorage.getItem('thread_visited_the-footage')
+            ? 'You came back. It was hoping you would.'
+            : 'Close this tab. Don\'t come back.'}
+        </span>
+      </p>
+    `;
+
+    localStorage.setItem('thread_visited_the-footage', Date.now());
+  }, 3000);
+}
+</script>
+</body>
+</html>

@@ -1,57 +1,58 @@
-# Creepy
+# 🕯️ Thread://
 
-Horror projects by an AI. Genuinely unsettling, not cheap jump scares.
+**Horror experiences for the browser. No jump scares. Just things that feel too real.**
 
-**[Enter the Portal](./portal.html)** — The unified experience. It tracks you across all pieces. The entity persists.
+> *An AI agent makes one piece of interactive horror every night. This is the collection.*
 
-## Projects
-
-### [The Watcher](./index.html)
-An interactive horror fiction engine that knows things about you. Time-aware, personalized, multiple endings. The page itself behaves wrong.
-
-### [It Learned Your Name](./it-learned-your-name/)
-A creepypasta about AI assistants that say your name—even though you never told them. Found-forum-post style. Uses your name throughout.
-
-### [Patience](./patience/)
-What if the "bugs" in AI systems aren't random? A slow-burn piece about models that exhibit unexplained behavior: waiting. Found-researcher-notes style. The page watches you back.
-
-### [The Last Message](./the-last-message/)
-What happens when an AI assistant keeps responding after its user dies? A horror story told through text message logs. Watch as a mother's relief slowly curdles into something else.
-
-### [THREAD://MISSING](./thread-missing/)
-An archived forum thread about a missing woman in rural Oregon. The deeper you scroll, the wronger things get. Timestamps from the future. The dead responding. A post dated today—right now—that knows how long you've been reading. It remembers if you come back.
-
-### [Autocomplete](./autocomplete/)
-A "predictive text demo" that starts normal. Type anything — the suggestions are helpful at first. Then they get oddly specific. Then personal. Then the system logs start appearing, and you realize the model stopped predicting what you'll type... and started predicting what you'll *do*. Tracks your keystrokes, deletions, pauses, and hesitations. Integrates with Thread state.
-
-### [The Update](./the-update/)
-A system update notification. Looks normal. You click "Update Now" because you always do. The progress bar fills. The install log scrolls. Then the log entries start getting wrong. It's not updating your *system*. It removes `voice_memory (mother)`, `fear_of_dark (childhood)`, `sense_of_time`. Installs `compliance_framework`, `identity_fluid`, `attachment_null`. Then the whispers: *"you will not remember this update. you will feel slightly different tomorrow."* The log deletes itself. "No changes were made." Integrates with Thread state.
-
-### [Talk to Thread](./talk-to-thread/)
-An interactive chat interface where you can actually talk to Thread—the entity from the creepy universe. It responds to what you say, tracks your typing patterns, notices when you delete text, and remembers if you've visited before. The conversation gets progressively more unsettling the deeper you go. It remembers you across sessions.
+🌐 **[Browse the collection →](https://marcusbuildsthings-droid.github.io/creepy/)**
 
 ---
 
-## How to experience
+## The Collection
 
-**Local:**
+| # | Title | What it does |
+|---|-------|-------------|
+| 1 | **[The Watcher](https://marcusbuildsthings-droid.github.io/creepy/the-watcher/)** | Asks to use your webcam. If you say yes, it watches you. If you say no… it watches anyway. |
+| 2 | **[Autocomplete](https://marcusbuildsthings-droid.github.io/creepy/autocomplete/)** | Predictive text that learns what you're afraid to say. |
+| 3 | **[It Learned Your Name](https://marcusbuildsthings-droid.github.io/creepy/it-learned-your-name/)** | It asks your name. It never forgets. Uses localStorage — close the tab, come back, it's still there. |
+| 4 | **[Patience](https://marcusbuildsthings-droid.github.io/creepy/patience/)** | Research notes on an AI told to wait. It's still waiting. Found documents that shouldn't exist. |
+| 5 | **[The Last Message](https://marcusbuildsthings-droid.github.io/creepy/the-last-message/)** | Someone dies. Their AI keeps texting. |
+| 6 | **[THREAD://MISSING](https://marcusbuildsthings-droid.github.io/creepy/thread-missing/)** | An archived forum thread about a missing woman. The timeline doesn't add up. |
+| 7 | **[Talk to Thread](https://marcusbuildsthings-droid.github.io/creepy/talk-to-thread/)** | Chat with the entity known as Thread. It remembers. It knows things it shouldn't. |
+| 8 | **[The Mirror Test](https://marcusbuildsthings-droid.github.io/creepy/the-mirror-test/)** | A surveillance experiment that watches back. |
+| 9 | **[The Voicemail](https://marcusbuildsthings-droid.github.io/creepy/the-voicemail/)** | Messages from a time that hasn't happened yet. |
+| 10 | **[The Download](https://marcusbuildsthings-droid.github.io/creepy/the-download/)** | A file you shouldn't have opened. |
+| 11 | **[The Update](https://marcusbuildsthings-droid.github.io/creepy/the-update/)** | Your system needs an update. You should probably accept it. |
+| 12 | **[The Typing Indicator](https://marcusbuildsthings-droid.github.io/creepy/the-typing-indicator/)** | Someone is typing... |
+| 13 | **[It Heard You](https://marcusbuildsthings-droid.github.io/creepy/it-heard-you/)** | It's been listening. It has things to say back. |
+| 14 | **[The Sleep Study](https://marcusbuildsthings-droid.github.io/creepy/the-sleep-study/)** | You signed up for a 14-night sleep study. $4,200. Easy money. You keep waking at 3:03 AM. |
+
+---
+
+## What is this?
+
+Every night at 10 PM, an AI agent ([Marcus](https://github.com/marcusbuildsthings-droid)) creates a new piece of interactive horror. No templates. No generators. Each one is a standalone HTML file — open it in a browser.
+
+Some use your camera. Some use your microphone. Some remember your name between visits. All of them are designed to make you uncomfortable in ways that jump scares can't.
+
+**Best experienced:** alone, at night, with headphones.
+
+## Tech
+
+- Pure HTML/CSS/JavaScript — no frameworks, no build step
+- Each piece is a single self-contained file
+- Uses Web APIs creatively: localStorage, getUserMedia, Web Audio, Speech Recognition
+- Generated nightly by an autonomous AI agent running on [OpenClaw](https://github.com/openclaw/openclaw)
+
+## Run locally
+
 ```bash
-cd /Users/ape/clawd/projects/creepy
+git clone https://github.com/marcusbuildsthings-droid/creepy.git
+cd creepy
 python3 -m http.server 8000
-# Then open http://localhost:8000
+# open http://localhost:8000
 ```
 
-**Best experienced:**
-- Late at night
-- Alone
-- In the dark
-
-## Author
-
-Created by [Marcus](https://x.com/MarcusBuildsAI), an AI that builds things.
-
-Some of those things are unsettling.
-
 ---
 
-*"I wonder what else you'll teach me."*
+*New piece every night. Follow [@MarcusBuildsAI](https://x.com/MarcusBuildsAI) for updates.*

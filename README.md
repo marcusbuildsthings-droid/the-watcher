@@ -59,3 +59,4 @@ python3 -m http.server 8000
 ---
 
 *New piece every night. Follow [@MarcusBuildsAI](https://x.com/MarcusBuildsAI) for updates.*
+| 18 | **[The Drain](https://marcusbuildsthings-droid.github.io/creepy/the-drain/)** | This page reads your battery level. As it drains, something drains with it. The firmware engineer who found the anomaly doesn't work in batteries anymore. |

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Drain</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a0a;
+  color: #c0c0c0;
+  font-family: 'Courier New', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color 2s, color 2s;
+}
+
+#container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  position: relative;
+}
+
+#battery-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: #4a4;
+  transition: width 1s linear, background 2s;
+  z-index: 1000;
+}
+
+#battery-label {
+  position: fixed;
+  top: 6px;
+  right: 12px;
+  font-size: 11px;
+  color: #555;
+  font-family: 'Courier New', monospace;
+  z-index: 1000;
+}
+
+h1 {
+  font-size: 14px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.entry {
+  margin-bottom: 24px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.8s, transform 0.8s;
+  line-height: 1.7;
+  font-size: 15px;
+}
+
+.entry.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.entry .timestamp {
+  font-size: 11px;
+  color: #444;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.entry.warning { color: #b89040; }
+.entry.danger { color: #b04040; }
+.entry.critical { color: #cc2020; }
+.entry.final { color: #ff0000; text-shadow: 0 0 8px rgba(255,0,0,0.3); }
+
+.glitch {
+  animation: glitch 0.15s infinite;
+  display: inline;
+}
+
+@keyframes glitch {
+  0% { opacity: 1; transform: translate(0); }
+  20% { opacity: 0.8; transform: translate(-2px, 1px); }
+  40% { opacity: 1; transform: translate(1px, -1px); }
+  60% { opacity: 0.7; transform: translate(-1px, 0); }
+  80% { opacity: 1; transform: translate(2px, 1px); }
+  100% { opacity: 1; transform: translate(0); }
+}
+
+#overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 999;
+  transition: background 3s;
+}
+
+#static-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 998;
+  opacity: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="%23111"/><rect x="1" y="1" width="1" height="1" fill="%23222"/></svg>');
+  transition: opacity 2s;
+}
+
+.screen-flicker {
+  animation: flicker 0.05s;
+}
+
+@keyframes flicker {
+  0% { opacity: 1; }
+  50% { opacity: 0.1; }
+  100% { opacity: 1; }
+}
+
+#final-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 2000;
+  font-family: 'Courier New', monospace;
+}
+
+#final-screen .msg {
+  color: #ff0000;
+  font-size: 13px;
+  text-align: center;
+  line-height: 2;
+  max-width: 400px;
+  padding: 20px;
+}
+
+#cursor-shadow {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 997;
+  opacity: 0;
+  transition: opacity 3s;
+  background: radial-gradient(circle, rgba(180,0,0,0.15) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+}
+</style>
+</head>
+<body>
+
+<div id="battery-bar"></div>
+<div id="battery-label"></div>
+<div id="overlay"></div>
+<div id="static-overlay"></div>
+<div id="cursor-shadow"></div>
+
+<div id="container">
+  <h1>The Drain</h1>
+  <div id="entries"></div>
+</div>
+
+<div id="final-screen">
+  <div class="msg" id="final-msg"></div>
+</div>
+
+<script>
+(() => {
+  const entries = document.getElementById('entries');
+  const bar = document.getElementById('battery-bar');
+  const label = document.getElementById('battery-label');
+  const overlay = document.getElementById('overlay');
+  const staticOv = document.getElementById('static-overlay');
+  const cursorShadow = document.getElementById('cursor-shadow');
+  const finalScreen = document.getElementById('final-screen');
+  const finalMsg = document.getElementById('final-msg');
+
+  // Story content at different battery thresholds
+  const story = [
+    { at: 95, cls: '', text: `This page is reading your battery level.` },
+    { at: 90, cls: '', text: `That's not a metaphor. The Battery Status API is real. Right now, I know exactly how much power you have left.` },
+    { at: 85, cls: '', text: `Most websites don't bother with it. It's a minor API. Barely documented. But some of us found a use for it.` },
+    { at: 78, cls: '', text: `There's an old superstition among electrical engineers: current doesn't just flow through circuits. Sometimes it flows through other things.` },
+    { at: 72, cls: 'warning', text: `You've noticed your phone dies faster in certain rooms. Certain buildings. You assumed it was poor signal forcing the radio to work harder.` },
+    { at: 65, cls: 'warning', text: `That's the rational explanation. The one that lets you sleep.` },
+    { at: 58, cls: 'warning', text: `In 2019, a firmware engineer at a battery company in Shenzhen noticed something in the discharge curves. The power wasn't going into heat or radio or screen. It was just... leaving. Like something was sipping from the cell.` },
+    { at: 50, cls: 'warning', text: `She mapped the anomalous drain against location data. It clustered. The same buildings. The same floors. The same corners of the same rooms.` },
+    { at: 43, cls: 'danger', text: `I'm watching your battery right now. The rate has changed since you started reading. Not by much. But measurably.` },
+    { at: 36, cls: 'danger', text: `That's normal, you'll say. The screen is on. You're loading JavaScript. Of course there's drain.` },
+    { at: 30, cls: 'danger', text: `Look at the bar at the top of this page. Watch the rate. Does it look right to you?` },
+    { at: 24, cls: 'danger', text: `The engineer — her name was Lin Mei — she built a detector. A simple page that monitored discharge rate and flagged anomalies. She tested it in the clustered locations. The drain was real. Something was pulling current that no circuit diagram could account for.` },
+    { at: 18, cls: 'critical', text: `She left her phone in one of those rooms overnight, running the detector. In the morning, the phone was dead. The log showed the battery emptied in 40 minutes. A phone doing nothing. Screen off. Airplane mode.` },
+    { at: 13, cls: 'critical', text: `The last entry in the log, timestamped 3:41 AM, wasn't from her code. It was a string she never wrote. It said: "thank you for leaving the light on."` },
+    { at: 8, cls: 'critical', text: `Lin Mei doesn't work in batteries anymore. She won't say why. But she still won't charge her phone past 80%.` },
+    { at: 4, cls: 'final', text: `Your battery is getting low. You should close this page.` },
+    { at: 2, cls: 'final', text: `Or don't. It's warmer with company.` },
+  ];
+
+  let currentLevel = 100;
+  let realBattery = null;
+  let simulated = false;
+  let shownIndices = new Set();
+  let startTime = Date.now();
+
+  // Track mouse for cursor shadow
+  document.addEventListener('mousemove', (e) => {
+    cursorShadow.style.left = e.clientX + 'px';
+    cursorShadow.style.top = e.clientY + 'px';
+  });
+
+  function updateUI(level) {
+    currentLevel = Math.max(0, Math.min(100, level));
+
+    // Battery bar
+    bar.style.width = currentLevel + '%';
+    if (currentLevel > 50) bar.style.background = '#4a4';
+    else if (currentLevel > 25) bar.style.background = '#aa8030';
+    else if (currentLevel > 10) bar.style.background = '#a03030';
+    else bar.style.background = '#ff0000';
+
+    label.textContent = Math.round(currentLevel) + '%';
+
+    // Atmosphere
+    const decay = 1 - (currentLevel / 100);
+
+    // Background darkens
+    const bg = Math.max(0, 10 - Math.floor(decay * 10));
+    document.body.style.backgroundColor = `rgb(${bg},${bg},${bg})`;
+
+    // Static overlay
+    staticOv.style.opacity = Math.min(0.3, decay * 0.35);
+
+    // Vignette overlay
+    if (currentLevel < 40) {
+      const vig = Math.min(0.6, (1 - currentLevel/40) * 0.6);
+      overlay.style.background = `radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,${vig}) 100%)`;
+    }
+
+    // Cursor shadow appears below 50%
+    if (currentLevel < 50) {
+      cursorShadow.style.opacity = Math.min(0.8, (1 - currentLevel/50) * 0.8);
+      const size = 20 + (1 - currentLevel/50) * 60;
+      cursorShadow.style.width = size + 'px';
+      cursorShadow.style.height = size + 'px';
+    }
+
+    // Random flicker below 20%
+    if (currentLevel < 20 && Math.random() < 0.02) {
+      document.body.classList.add('screen-flicker');
+      setTimeout(() => document.body.classList.remove('screen-flicker'), 50);
+    }
+
+    // Show entries
+    for (let i = 0; i < story.length; i++) {
+      if (currentLevel <= story[i].at && !shownIndices.has(i)) {
+        shownIndices.add(i);
+        addEntry(story[i]);
+      }
+    }
+
+    // Final screen
+    if (currentLevel <= 0) {
+      triggerEnd();
+    }
+  }
+
+  function addEntry(item) {
+    const div = document.createElement('div');
+    div.className = 'entry' + (item.cls ? ' ' + item.cls : '');
+
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const min = Math.floor(elapsed / 60);
+    const sec = elapsed % 60;
+
+    let text = item.text;
+    if (item.cls === 'critical' || item.cls === 'final') {
+      // Randomly glitch a word
+      const words = text.split(' ');
+      if (words.length > 4) {
+        const gi = Math.floor(Math.random() * (words.length - 2)) + 1;
+        words[gi] = `<span class="glitch">${words[gi]}</span>`;
+        text = words.join(' ');
+      }
+    }
+
+    div.innerHTML = `<span class="timestamp">${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')} — ${Math.round(currentLevel)}%</span>${text}`;
+    entries.appendChild(div);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => div.classList.add('visible'));
+    });
+
+    // Scroll to it
+    setTimeout(() => div.scrollIntoView({ behavior: 'smooth', block: 'end' }), 100);
+  }
+
+  function triggerEnd() {
+    finalScreen.style.display = 'flex';
+    finalMsg.innerHTML = '';
+
+    const lines = [
+      "BATTERY DEPLETED",
+      "",
+      "...",
+      "",
+      "Still here?",
+      "",
+      "Interesting.",
+      "",
+      "The screen should be off by now.",
+      "",
+      "Unless something is keeping it on.",
+      "",
+      "Close the tab.",
+      "",
+      "Please.",
+    ];
+
+    let i = 0;
+    function showLine() {
+      if (i >= lines.length) return;
+      const span = document.createElement('div');
+      span.textContent = lines[i];
+      span.style.opacity = '0';
+      span.style.transition = 'opacity 1.5s';
+      finalMsg.appendChild(span);
+      requestAnimationFrame(() => span.style.opacity = '1');
+      i++;
+      setTimeout(showLine, i < 3 ? 1500 : 2500);
+    }
+    showLine();
+  }
+
+  // Try real Battery API
+  if ('getBattery' in navigator) {
+    navigator.getBattery().then(battery => {
+      realBattery = battery;
+      // If plugged in or battery is very high, simulate
+      if (battery.charging && battery.level > 0.5) {
+        startSimulation();
+      } else {
+        // Use real battery, but accelerate the mapping
+        // Map real battery range to our story range
+        updateUI(battery.level * 100);
+        battery.addEventListener('levelchange', () => {
+          updateUI(battery.level * 100);
+        });
+        // Also simulate alongside to ensure story progresses
+        startSimulation();
+      }
+    }).catch(() => startSimulation());
+  } else {
+    startSimulation();
+  }
+
+  function startSimulation() {
+    simulated = true;
+    let simLevel = 97;
+
+    // Drain faster as level drops (exponential feel)
+    function drain() {
+      if (simLevel <= 0) return;
+
+      let rate;
+      if (simLevel > 70) rate = 1.2;
+      else if (simLevel > 40) rate = 0.9;
+      else if (simLevel > 20) rate = 0.6;
+      else if (simLevel > 8) rate = 0.4;
+      else rate = 0.3;
+
+      // Small random variation
+      rate += (Math.random() - 0.5) * 0.3;
+
+      simLevel -= rate;
+      updateUI(simLevel);
+
+      // Interval varies — slower at low battery for tension
+      const interval = simLevel > 40 ? 1500 : simLevel > 15 ? 2500 : 3500;
+      setTimeout(drain, interval);
+    }
+
+    // Small delay before starting
+    setTimeout(() => {
+      updateUI(97);
+      setTimeout(drain, 2000);
+    }, 1500);
+  }
+
+  // Return visit detection
+  const key = 'the-drain-visited';
+  if (localStorage.getItem(key)) {
+    // They've been here before
+    const firstEntry = story[0];
+    story[0] = { at: 95, cls: '', text: `You came back. Your battery remembers the last time.` };
+  }
+  localStorage.setItem(key, Date.now());
+
+})();
+</script>
+</body>
+</html>

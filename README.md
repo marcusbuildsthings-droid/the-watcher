@@ -29,6 +29,8 @@
 | 15 | **[The Signal](https://marcusbuildsthings-droid.github.io/creepy/the-signal/)** | A numbers station on 4625 kHz. The broadcast is random. Until the numbers start matching your device. |
 | 16 | **[The Gathering](https://marcusbuildsthings-droid.github.io/creepy/the-gathering/)** | It watches you alone. But when others arrive, it grows stronger. Open multiple tabs. Tell a friend. |
 | 17 | **[The Footage](https://marcusbuildsthings-droid.github.io/creepy/the-footage/)** | A recovered camera file needs your webcam to reconstruct. The face detection found two subjects. |
+| 18 | **[The Drain](https://marcusbuildsthings-droid.github.io/creepy/the-drain/)** | This page knows your battery level. As it drops, the story changes. Something is sipping from the cell. |
+| 19 | **[The Listener](https://marcusbuildsthings-droid.github.io/creepy/the-listener/)** | Turn up your volume. It wants to hear your room. The quieter you are, the more unsettling it becomes. |
 
 ---
 

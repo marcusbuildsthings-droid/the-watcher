@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Listener</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@300;400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: radial-gradient(ellipse at center, #0a0a0a 0%, #000000 70%);
+            color: #2a8b2a;
+            font-family: 'Source Code Pro', monospace;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .terminal {
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.4;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        
+        .prompt {
+            color: #00ff00;
+        }
+        
+        .error {
+            color: #ff4444;
+        }
+        
+        .warning {
+            color: #ffaa00;
+        }
+        
+        .listening {
+            color: #44ff44;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+        
+        .visualization {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 60px;
+            border: 1px solid #2a8b2a;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: end;
+            padding: 5px;
+            gap: 2px;
+        }
+        
+        .bar {
+            background: #2a8b2a;
+            width: 4px;
+            height: 2px;
+            transition: height 0.1s ease;
+        }
+        
+        .glitch {
+            animation: glitch 0.1s ease-in-out;
+        }
+        
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        
+        .static {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(255, 255, 255, 0.03) 2px,
+                    rgba(255, 255, 255, 0.03) 4px
+                );
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        .cursor-shadow {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, rgba(255, 0, 0, 0.2) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            transition: transform 0.1s ease;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="static" id="static"></div>
+    <div class="cursor-shadow" id="cursorShadow"></div>
+    
+    <div class="terminal" id="terminal">
+        <div><span class="prompt">user@localhost:~$</span> ./audio_analyzer --mode=passive</div>
+        <div>Audio Analysis Tool v2.3.1</div>
+        <div>Initializing microphone interface...</div>
+        <div id="micStatus">Requesting microphone access...</div>
+        <div></div>
+    </div>
+    
+    <div class="visualization" id="visualization" style="display: none;">
+        <!-- Audio bars will be generated here -->
+    </div>
+    
+    <script>
+        class AudioHorror {
+            constructor() {
+                this.audioContext = null;
+                this.analyser = null;
+                this.microphone = null;
+                this.dataArray = null;
+                this.oscillators = [];
+                this.gainNodes = [];
+                this.isListening = false;
+                this.silenceTime = 0;
+                this.lastNoiseTime = Date.now();
+                this.storyStage = 0;
+                this.glitchLevel = 0;
+                
+                this.init();
+            }
+            
+            async init() {
+                const terminal = document.getElementById('terminal');
+                const micStatus = document.getElementById('micStatus');
+                
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    micStatus.innerHTML = '<span class="listening">✓ Microphone connected - analyzing ambient audio...</span>';
+                    
+                    setTimeout(() => {
+                        terminal.innerHTML += '<div>Baseline noise floor: -42 dBFS</div>';
+                        terminal.innerHTML += '<div>Frequency range: 20Hz - 20kHz</div>';
+                        terminal.innerHTML += '<div></div>';
+                        terminal.innerHTML += '<div class="warning">Warning: Anomalous patterns detected in sub-audible range</div>';
+                        terminal.innerHTML += '<div>Switching to enhanced monitoring mode...</div>';
+                        terminal.innerHTML += '<div></div>';
+                    }, 1500);
+                    
+                    this.setupAudio(stream);
+                    this.createVisualization();
+                    this.startStory();
+                    
+                } catch (err) {
+                    micStatus.innerHTML = '<span class="error">✗ Microphone access denied</span>';
+                    setTimeout(() => {
+                        terminal.innerHTML += '<div class="error">ERROR: Cannot establish audio monitoring</div>';
+                        terminal.innerHTML += '<div>Falling back to passive observation mode...</div>';
+                        terminal.innerHTML += '<div></div>';
+                        this.startStoryWithoutMic();
+                    }, 1000);
+                }
+            }
+            
+            setupAudio(stream) {
+                this.microphone = this.audioContext.createMediaStreamSource(stream);
+                this.analyser = this.audioContext.createAnalyser();
+                this.analyser.fftSize = 256;
+                this.analyser.smoothingTimeConstant = 0.8;
+                
+                this.microphone.connect(this.analyser);
+                this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+                
+                this.isListening = true;
+                this.monitorAudio();
+                this.generateAmbientTones();
+            }
+            
+            createVisualization() {
+                const viz = document.getElementById('visualization');
+                viz.style.display = 'flex';
+                
+                for (let i = 0; i < 40; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'bar';
+                    viz.appendChild(bar);
+                }
+            }
+            
+            monitorAudio() {
+                if (!this.isListening) return;
+                
+                this.analyser.getByteFrequencyData(this.dataArray);
+                
+                const average = this.dataArray.reduce((a, b) => a + b, 0) / this.dataArray.length;
+                const maxValue = Math.max(...this.dataArray);
+                
+                this.updateVisualization();
+                this.analyzeForAnomalies(average, maxValue);
+                
+                requestAnimationFrame(() => this.monitorAudio());
+            }
+            
+            updateVisualization() {
+                const bars = document.querySelectorAll('.bar');
+                bars.forEach((bar, i) => {
+                    const height = (this.dataArray[i] / 255) * 50;
+                    bar.style.height = `${Math.max(2, height)}px`;
+                    
+                    if (this.glitchLevel > 0.3 && Math.random() < 0.1) {
+                        bar.style.background = '#ff4444';
+                        setTimeout(() => {
+                            bar.style.background = '#2a8b2a';
+                        }, 100);
+                    }
+                });
+            }
+            
+            analyzeForAnomalies(average, maxValue) {
+                const now = Date.now();
+                
+                if (average < 5) {
+                    this.silenceTime += 50;
+                } else {
+                    this.silenceTime = 0;
+                    this.lastNoiseTime = now;
+                }
+                
+                // The quieter it gets, the more unsettling things become
+                if (this.silenceTime > 5000) {
+                    this.glitchLevel = Math.min(1, this.silenceTime / 15000);
+                    this.triggerDisturbance();
+                }
+                
+                // Or sudden loud noises trigger events
+                if (maxValue > 200) {
+                    this.triggerSuddenResponse();
+                }
+            }
+            
+            generateAmbientTones() {
+                // Create subtle, unsettling background tones
+                const frequencies = [52.5, 87.5, 123.5]; // Sub-bass frequencies
+                
+                frequencies.forEach((freq, i) => {
+                    const osc = this.audioContext.createOscillator();
+                    const gain = this.audioContext.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, this.audioContext.currentTime);
+                    gain.gain.setValueAtTime(0.01, this.audioContext.currentTime);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.audioContext.destination);
+                    
+                    osc.start();
+                    
+                    this.oscillators.push(osc);
+                    this.gainNodes.push(gain);
+                    
+                    // Subtle frequency modulation
+                    setInterval(() => {
+                        if (this.isListening) {
+                            const wobble = Math.sin(Date.now() / 10000) * 2;
+                            osc.frequency.setValueAtTime(freq + wobble, this.audioContext.currentTime);
+                        }
+                    }, 100);
+                });
+            }
+            
+            triggerDisturbance() {
+                if (Math.random() < 0.05) { // 5% chance per frame
+                    const terminal = document.getElementById('terminal');
+                    const glitchTexts = [
+                        '<div class="glitch error">!@#$%^&*()_+{}|:"<>?</div>',
+                        '<div class="glitch warning">listening... listening... listening...</div>',
+                        '<div class="glitch">signal detected: unknown source</div>'
+                    ];
+                    
+                    terminal.innerHTML += glitchTexts[Math.floor(Math.random() * glitchTexts.length)];
+                    terminal.scrollTop = terminal.scrollHeight;
+                    
+                    // Visual static
+                    const static = document.getElementById('static');
+                    static.style.opacity = this.glitchLevel * 0.3;
+                    setTimeout(() => {
+                        static.style.opacity = 0;
+                    }, 200);
+                }
+            }
+            
+            triggerSuddenResponse() {
+                const terminal = document.getElementById('terminal');
+                const responses = [
+                    '<div class="warning">Sudden amplitude spike detected</div>',
+                    '<div class="error">Audio source triangulated: your location</div>',
+                    '<div class="listening">Response acknowledged</div>'
+                ];
+                
+                terminal.innerHTML += responses[Math.floor(Math.random() * responses.length)];
+                terminal.scrollTop = terminal.scrollHeight;
+                
+                // Brief tone burst
+                if (this.audioContext) {
+                    const osc = this.audioContext.createOscillator();
+                    const gain = this.audioContext.createGain();
+                    
+                    osc.frequency.setValueAtTime(880, this.audioContext.currentTime);
+                    gain.gain.setValueAtTime(0.05, this.audioContext.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.2);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.audioContext.destination);
+                    
+                    osc.start();
+                    osc.stop(this.audioContext.currentTime + 0.2);
+                }
+            }
+            
+            startStory() {
+                const storyBeats = [
+                    () => {
+                        const terminal = document.getElementById('terminal');
+                        terminal.innerHTML += '<div>Pattern analysis complete</div>';
+                        terminal.innerHTML += '<div class="warning">Subaudible frequencies contain encoded data</div>';
+                        terminal.innerHTML += '<div></div>';
+                    },
+                    () => {
+                        const terminal = document.getElementById('terminal');
+                        terminal.innerHTML += '<div>Decoding sequence...</div>';
+                        terminal.innerHTML += '<div class="listening">Message fragment: "can you hear us?"</div>';
+                        terminal.innerHTML += '<div></div>';
+                    },
+                    () => {
+                        const terminal = document.getElementById('terminal');
+                        terminal.innerHTML += '<div class="error">ERROR: Bidirectional communication detected</div>';
+                        terminal.innerHTML += '<div>Something is listening back.</div>';
+                        terminal.innerHTML += '<div></div>';
+                    },
+                    () => {
+                        const terminal = document.getElementById('terminal');
+                        terminal.innerHTML += '<div class="warning">Triangulation complete</div>';
+                        terminal.innerHTML += '<div class="error">Source location: this device</div>';
+                        terminal.innerHTML += '<div></div>';
+                        terminal.innerHTML += '<div class="listening">they know you\'re here now</div>';
+                    }
+                ];
+                
+                storyBeats.forEach((beat, index) => {
+                    setTimeout(beat, (index + 3) * 8000); // 8 second intervals
+                });
+            }
+            
+            startStoryWithoutMic() {
+                // Fallback story for when mic access is denied
+                const terminal = document.getElementById('terminal');
+                setTimeout(() => {
+                    terminal.innerHTML += '<div>Passive sensors detecting residual audio signatures...</div>';
+                    terminal.innerHTML += '<div class="warning">Something was here recently</div>';
+                    terminal.innerHTML += '<div class="listening">The silence is louder than any sound</div>';
+                }, 3000);
+            }
+        }
+        
+        // Cursor shadow effect
+        document.addEventListener('mousemove', (e) => {
+            const shadow = document.getElementById('cursorShadow');
+            shadow.style.left = e.clientX + 'px';
+            shadow.style.top = e.clientY + 'px';
+        });
+        
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            new AudioHorror();
+        });
+        
+        // Keep the page alive and responsive
+        setInterval(() => {
+            const terminal = document.getElementById('terminal');
+            terminal.scrollTop = terminal.scrollHeight;
+        }, 1000);
+    </script>
+</body>
+</html>

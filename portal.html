@@ -406,6 +406,15 @@
                     <span class="visits"></span>
                 </div>
             </a>
+
+            <a href="the-listener/" class="piece" data-piece="the-listener">
+                <div class="piece-title">The Listener</div>
+                <div class="piece-description">Turn up your volume. It wants to hear your room. The quieter you are, the more unsettling it becomes. Something responds to sound—and silence.</div>
+                <div class="piece-meta">
+                    <span class="type">web audio / microphone</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
         </div>
 
         <div class="message hidden" id="personal-message"></div>
@@ -435,7 +444,7 @@
             
             document.getElementById('total-visits').textContent = state.totalVisits || 0;
             document.getElementById('known-pieces').textContent = 
-                `${state.visitedPieces.filter(p => p !== 'portal').length} / 18`;
+                `${state.visitedPieces.filter(p => p !== 'portal').length} / 19`;
             
             if (state.firstSeen) {
                 document.getElementById('first-seen-row').style.display = 'flex';

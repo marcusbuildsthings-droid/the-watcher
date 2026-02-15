@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Detection System v2.4</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0a0a0a;
+            color: #00ff41;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            overflow: hidden;
+            cursor: crosshair;
+            transition: all 2s ease;
+        }
+        
+        .terminal {
+            padding: 20px;
+            height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header {
+            border-bottom: 1px solid #00ff41;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .title {
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .subtitle {
+            font-weight: 300;
+            color: #00cc33;
+            margin-top: 5px;
+        }
+        
+        .content {
+            height: calc(100vh - 120px);
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin-bottom: 15px;
+            opacity: 0;
+            animation: fadeIn 0.5s ease forwards;
+        }
+        
+        .timestamp {
+            color: #666;
+            margin-right: 10px;
+        }
+        
+        .status {
+            color: #00ff41;
+        }
+        
+        .warning {
+            color: #ffaa00;
+        }
+        
+        .error {
+            color: #ff4444;
+        }
+        
+        .critical {
+            color: #ff0000;
+            font-weight: 700;
+            text-shadow: 0 0 10px #ff0000;
+        }
+        
+        .lux-reading {
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            padding: 2px 6px;
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff41;
+            border-radius: 3px;
+        }
+        
+        .shadow-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.9) 100%);
+            opacity: 0;
+            transition: opacity 3s ease;
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        .glitch {
+            animation: glitchText 0.3s ease-in-out;
+        }
+        
+        .cursor {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        @keyframes glitchText {
+            0% { transform: translateX(0); }
+            10% { transform: translateX(-2px) skew(15deg); }
+            20% { transform: translateX(2px) skew(-15deg); }
+            30% { transform: translateX(-1px) skew(10deg); }
+            40% { transform: translateX(1px) skew(-10deg); }
+            50% { transform: translateX(0) skew(5deg); }
+            100% { transform: translateX(0); }
+        }
+        
+        .dark-mode {
+            background: #000000;
+            color: #ff0000;
+        }
+        
+        .dark-mode .status {
+            color: #ff4444;
+        }
+        
+        .dark-mode .lux-reading {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+        
+        .very-dark {
+            cursor: none;
+        }
+        
+        .shadow-text {
+            text-shadow: 0 0 20px currentColor;
+        }
+    </style>
+</head>
+<body>
+    <div class="shadow-overlay" id="shadowOverlay"></div>
+    
+    <div class="terminal">
+        <div class="header">
+            <div class="title">Shadow Detection System</div>
+            <div class="subtitle">Environmental Lighting Analysis Protocol</div>
+        </div>
+        
+        <div class="content" id="logContainer">
+            <div class="log-entry">
+                <span class="timestamp">[22:03:14]</span>
+                <span class="status">SYSTEM:</span> Initializing ambient light sensors...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let lightSensor = null;
+        let currentLux = 100;
+        let lastReading = Date.now();
+        let phase = 0;
+        let glitchLevel = 0;
+        
+        const logContainer = document.getElementById('logContainer');
+        const shadowOverlay = document.getElementById('shadowOverlay');
+        const body = document.body;
+        
+        function getTimestamp() {
+            return new Date().toLocaleTimeString('en-US', { hour12: false });
+        }
+        
+        function addLogEntry(message, type = 'status', delay = 0) {
+            setTimeout(() => {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.innerHTML = `<span class="timestamp">[${getTimestamp()}]</span><span class="${type}">${message}</span>`;
+                logContainer.appendChild(entry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+                if (Math.random() < glitchLevel) {
+                    entry.classList.add('glitch');
+                    setTimeout(() => entry.classList.remove('glitch'), 300);
+                }
+            }, delay);
+        }
+        
+        function updateEnvironment(lux) {
+            currentLux = lux;
+            
+            // Update shadow overlay opacity based on darkness
+            const shadowOpacity = Math.max(0, (50 - lux) / 50);
+            shadowOverlay.style.opacity = shadowOpacity;
+            
+            // Change UI based on light levels
+            if (lux < 5) {
+                body.classList.add('dark-mode', 'very-dark');
+                body.style.cursor = 'none';
+                glitchLevel = 0.4;
+            } else if (lux < 20) {
+                body.classList.add('dark-mode');
+                body.classList.remove('very-dark');
+                body.style.cursor = 'crosshair';
+                glitchLevel = 0.2;
+            } else {
+                body.classList.remove('dark-mode', 'very-dark');
+                body.style.cursor = 'crosshair';
+                glitchLevel = 0.05;
+            }
+        }
+        
+        function startLightMonitoring() {
+            if ('AmbientLightSensor' in window) {
+                try {
+                    lightSensor = new AmbientLightSensor({ frequency: 2 });
+                    
+                    lightSensor.addEventListener('reading', () => {
+                        const lux = Math.round(lightSensor.illuminance);
+                        updateEnvironment(lux);
+                        
+                        if (Date.now() - lastReading > 3000) {
+                            addLogEntry(`SENSOR: Ambient light detected at <span class="lux-reading">${lux} lux</span>`, 'status');
+                            lastReading = Date.now();
+                        }
+                        
+                        // Progressive story based on light levels
+                        if (lux < 50 && phase === 0) {
+                            phase = 1;
+                            addLogEntry('WARNING: Low light conditions detected.', 'warning', 2000);
+                            addLogEntry('SYSTEM: Activating enhanced shadow detection...', 'status', 4000);
+                        } else if (lux < 20 && phase === 1) {
+                            phase = 2;
+                            addLogEntry('ANALYSIS: Unusual shadow patterns identified.', 'warning', 3000);
+                            addLogEntry('SENSOR: Shadow movement detected in peripheral zones.', 'error', 6000);
+                        } else if (lux < 5 && phase === 2) {
+                            phase = 3;
+                            addLogEntry('CRITICAL: Shadow entities manifesting in low-light environment.', 'critical', 2000);
+                            addLogEntry('WARNING: Shadows are not behaving according to physics models.', 'error', 5000);
+                            addLogEntry('ERROR: They can see you looking at this screen.', 'critical', 8000);
+                            
+                            // Add shadow text effect
+                            setTimeout(() => {
+                                body.classList.add('shadow-text');
+                            }, 10000);
+                        }
+                    });
+                    
+                    lightSensor.addEventListener('error', event => {
+                        addLogEntry(`ERROR: Sensor malfunction - ${event.error.message}`, 'error');
+                        startFallbackMode();
+                    });
+                    
+                    lightSensor.start();
+                    addLogEntry('STATUS: Light sensor active. Please turn off some lights to begin shadow analysis.', 'status', 1000);
+                    
+                } catch (error) {
+                    addLogEntry(`ERROR: Cannot access light sensor - ${error.message}`, 'error', 1000);
+                    startFallbackMode();
+                }
+            } else {
+                addLogEntry('WARNING: Ambient light sensor not supported on this device.', 'warning', 1000);
+                startFallbackMode();
+            }
+        }
+        
+        function startFallbackMode() {
+            addLogEntry('SYSTEM: Switching to manual shadow detection mode.', 'status', 2000);
+            addLogEntry('INSTRUCTION: Turn off the lights around you for optimal results.', 'status', 4000);
+            
+            // Simulate detection based on screen brightness or time of day
+            const hour = new Date().getHours();
+            let simulatedLux = 50;
+            
+            if (hour >= 20 || hour <= 6) {
+                simulatedLux = Math.random() * 15 + 5; // 5-20 lux at night
+            } else {
+                simulatedLux = Math.random() * 100 + 50; // 50-150 lux during day
+            }
+            
+            // Progressive simulation
+            let currentSim = simulatedLux;
+            const interval = setInterval(() => {
+                currentSim = Math.max(0, currentSim - Math.random() * 5);
+                updateEnvironment(currentSim);
+                
+                if (Math.random() < 0.3) {
+                    addLogEntry(`ESTIMATE: Ambient light approximately <span class="lux-reading">${Math.round(currentSim)} lux</span>`, 'status');
+                }
+                
+                if (currentSim < 1) {
+                    clearInterval(interval);
+                    addLogEntry('CRITICAL: Complete darkness achieved. Shadow entities fully active.', 'critical');
+                }
+            }, 5000);
+        }
+        
+        // Initialize
+        setTimeout(() => {
+            addLogEntry('SYSTEM: Calibrating environmental sensors...', 'status');
+            startLightMonitoring();
+        }, 1500);
+        
+        setTimeout(() => {
+            addLogEntry('INFO: This system detects shadow anomalies in low-light conditions.', 'status');
+        }, 3000);
+        
+        setTimeout(() => {
+            addLogEntry('NOTICE: For best results, gradually dim the lights in your room.', 'status');
+        }, 5000);
+        
+        // Easter egg: detect if user is covering their camera/sensor
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            setTimeout(() => {
+                addLogEntry('OPTIONAL: Camera access will enhance shadow detection accuracy.', 'status');
+            }, 8000);
+        }
+        
+        // Periodic atmospheric messages
+        setInterval(() => {
+            if (currentLux < 10 && Math.random() < 0.3) {
+                const messages = [
+                    'SENSOR: Motion detected in unlit areas.',
+                    'ANALYSIS: Shadows moving independently of light sources.',
+                    'WARNING: Something is watching from the dark corners.',
+                    'ERROR: Shadow entities approaching detection threshold.',
+                    'CRITICAL: They know you can see them now.'
+                ];
+                const msg = messages[Math.floor(Math.random() * messages.length)];
+                addLogEntry(msg, Math.random() < 0.5 ? 'warning' : 'error');
+            }
+        }, 15000);
+        
+        // Glitch effect on very dark conditions
+        setInterval(() => {
+            if (currentLux < 5 && Math.random() < 0.1) {
+                body.style.filter = 'invert(1) hue-rotate(180deg)';
+                setTimeout(() => {
+                    body.style.filter = 'none';
+                }, 100);
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

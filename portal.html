@@ -424,6 +424,15 @@
                     <span class="visits"></span>
                 </div>
             </a>
+
+            <a href="motion-sickness/" class="piece" data-piece="motion-sickness">
+                <div class="piece-title">Motion Sickness</div>
+                <div class="piece-description">Hold your device steady. The motion analysis system detects every tremor, every shake. Something lives in your accelerometer.</div>
+                <div class="piece-meta">
+                    <span class="type">device motion api / behavioral</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
         </div>
 
         <div class="message hidden" id="personal-message"></div>
@@ -453,7 +462,7 @@
             
             document.getElementById('total-visits').textContent = state.totalVisits || 0;
             document.getElementById('known-pieces').textContent = 
-                `${state.visitedPieces.filter(p => p !== 'portal').length} / 19`;
+                `${state.visitedPieces.filter(p => p !== 'portal').length} / 21`;
             
             if (state.firstSeen) {
                 document.getElementById('first-seen-row').style.display = 'flex';

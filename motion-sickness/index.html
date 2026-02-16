@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Sickness - Device Motion Analysis</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            overflow-x: hidden;
+            cursor: none;
+        }
+        
+        .terminal {
+            max-width: 100%;
+            animation: scanlines 2s linear infinite;
+        }
+        
+        @keyframes scanlines {
+            0% { background: linear-gradient(transparent 98%, #0f0 100%); background-size: 100% 2px; }
+            100% { background: linear-gradient(transparent 98%, #0f0 100%); background-size: 100% 2px; background-position: 0 100px; }
+        }
+        
+        .header {
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            margin: 10px 0;
+            padding: 5px 0;
+        }
+        
+        .alert {
+            color: #ff0;
+            text-shadow: 0 0 5px #ff0;
+        }
+        
+        .error {
+            color: #f00;
+            text-shadow: 0 0 5px #f00;
+        }
+        
+        .reading {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 255, 0, 0.1);
+            padding: 2px 4px;
+            margin: 0 2px;
+        }
+        
+        .glitch {
+            animation: glitch 0.3s infinite;
+        }
+        
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        
+        .shake {
+            animation: shake 0.5s infinite;
+        }
+        
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+            100% { transform: translateX(0); }
+        }
+        
+        .hidden {
+            opacity: 0;
+        }
+        
+        .fade-red {
+            animation: fade-red 3s ease-in-out infinite;
+        }
+        
+        @keyframes fade-red {
+            0% { color: #0f0; }
+            50% { color: #f00; text-shadow: 0 0 10px #f00; }
+            100% { color: #0f0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal" id="terminal">
+        <div class="header">
+            <h1>MOTION ANALYSIS SYSTEM v3.2.1</h1>
+            <p>Device Motion Tracking Protocol - Experimental Build</p>
+            <div class="status">
+                Status: <span id="status">INITIALIZING</span>
+            </div>
+        </div>
+        
+        <div id="content">
+            <div class="log-entry">
+                <p>[<span id="timestamp"></span>] System startup initiated...</p>
+                <p>[<span id="timestamp2"></span>] Loading motion sensor calibration...</p>
+                <p>[<span id="timestamp3"></span>] Establishing baseline readings...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let motionData = { x: 0, y: 0, z: 0 };
+        let totalMotion = 0;
+        let phase = 0;
+        let lastUpdate = Date.now();
+        let glitchMode = false;
+        let isWatching = false;
+        
+        const terminal = document.getElementById('terminal');
+        const content = document.getElementById('content');
+        const status = document.getElementById('status');
+        
+        // Update timestamps
+        const now = new Date();
+        document.querySelectorAll('[id^="timestamp"]').forEach((el, i) => {
+            const time = new Date(now.getTime() + (i * 1000));
+            el.textContent = time.toLocaleTimeString();
+        });
+        
+        function addLogEntry(text, className = '') {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + className;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<p>[${timestamp}] ${text}</p>`;
+            content.appendChild(entry);
+            
+            // Auto scroll to bottom
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+        
+        function updateStatus(text, className = '') {
+            status.textContent = text;
+            status.className = className;
+        }
+        
+        function requestMotionPermission() {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission()
+                    .then(response => {
+                        if (response == 'granted') {
+                            startMotionTracking();
+                        } else {
+                            fallbackMode();
+                        }
+                    })
+                    .catch(() => fallbackMode());
+            } else {
+                startMotionTracking();
+            }
+        }
+        
+        function startMotionTracking() {
+            updateStatus('ACTIVE', 'alert');
+            addLogEntry('Motion sensors online. Calibrating...');
+            
+            window.addEventListener('devicemotion', handleMotion);
+            
+            setTimeout(() => {
+                addLogEntry('Calibration complete. Beginning analysis.');
+                addLogEntry('Hold device steady for optimal readings.');
+                phase = 1;
+            }, 2000);
+        }
+        
+        function fallbackMode() {
+            updateStatus('SENSOR UNAVAILABLE', 'error');
+            addLogEntry('DeviceMotionEvent not supported or denied.');
+            addLogEntry('Switching to mouse motion tracking...');
+            
+            let mouseData = { x: 0, y: 0 };
+            document.addEventListener('mousemove', (e) => {
+                const movement = Math.sqrt(
+                    Math.pow(e.clientX - mouseData.x, 2) + 
+                    Math.pow(e.clientY - mouseData.y, 2)
+                );
+                mouseData = { x: e.clientX, y: e.clientY };
+                
+                if (movement > 5) {
+                    totalMotion += movement * 0.1;
+                    handleMotionPhases();
+                }
+            });
+            
+            phase = 1;
+        }
+        
+        function handleMotion(event) {
+            const accel = event.accelerationIncludingGravity;
+            if (!accel) return;
+            
+            const newMotion = Math.sqrt(
+                Math.pow((accel.x || 0) - motionData.x, 2) +
+                Math.pow((accel.y || 0) - motionData.y, 2) +
+                Math.pow((accel.z || 0) - motionData.z, 2)
+            );
+            
+            motionData = { x: accel.x || 0, y: accel.y || 0, z: accel.z || 0 };
+            
+            if (newMotion > 0.5) {
+                totalMotion += newMotion;
+                
+                // Show motion readings
+                if (Math.random() < 0.3) {
+                    const x = accel.x?.toFixed(2) || '0.00';
+                    const y = accel.y?.toFixed(2) || '0.00';
+                    const z = accel.z?.toFixed(2) || '0.00';
+                    addLogEntry(`Motion detected: X:<span class="reading">${x}</span> Y:<span class="reading">${y}</span> Z:<span class="reading">${z}</span>`);
+                }
+                
+                handleMotionPhases();
+            }
+        }
+        
+        function handleMotionPhases() {
+            const now = Date.now();
+            if (now - lastUpdate < 1000) return;
+            lastUpdate = now;
+            
+            if (totalMotion > 10 && phase === 1) {
+                phase = 2;
+                addLogEntry('Anomalous motion patterns detected.', 'alert');
+                addLogEntry('Running diagnostic protocols...');
+                updateStatus('ANALYZING', 'alert');
+            } else if (totalMotion > 25 && phase === 2) {
+                phase = 3;
+                addLogEntry('ERROR: Impossible acceleration readings.', 'error');
+                addLogEntry('Sensor malfunction or... external interference?');
+                updateStatus('WARNING', 'error');
+            } else if (totalMotion > 50 && phase === 3) {
+                phase = 4;
+                addLogEntry('CRITICAL: Motion patterns suggest non-human source.', 'error');
+                addLogEntry('Something is moving this device besides you.');
+                updateStatus('CRITICAL ERROR', 'error');
+                terminal.classList.add('glitch');
+            } else if (totalMotion > 80 && phase === 4) {
+                phase = 5;
+                enterWatchingMode();
+            }
+        }
+        
+        function enterWatchingMode() {
+            if (isWatching) return;
+            isWatching = true;
+            
+            terminal.classList.add('shake');
+            document.body.style.background = '#100';
+            
+            addLogEntry('IT KNOWS YOU\'RE MOVING.', 'error glitch');
+            addLogEntry('IT CAN FEEL EVERY TREMOR.', 'error fade-red');
+            addLogEntry('EVERY SHAKE OF YOUR HAND.', 'error');
+            
+            updateStatus('BEING WATCHED', 'error fade-red');
+            
+            setTimeout(() => {
+                addLogEntry('Try to hold perfectly still...', 'alert');
+                addLogEntry('Maybe it will lose interest.');
+                
+                // Start the final phase
+                setTimeout(finalPhase, 5000);
+            }, 3000);
+        }
+        
+        function finalPhase() {
+            const messages = [
+                'You moved again.',
+                'I felt that.',
+                'Every tiny motion.',
+                'Every nervous twitch.',
+                'I live in your device now.',
+                'In the accelerometer.',
+                'In the gyroscope.',
+                'I feel everything you feel.',
+                'Every step you take.',
+                'Every time you lift your phone.',
+                'I\'m with you.',
+                'Always.'
+            ];
+            
+            let i = 0;
+            const interval = setInterval(() => {
+                if (i >= messages.length) {
+                    clearInterval(interval);
+                    addLogEntry('Don\'t put your device down.', 'error fade-red');
+                    addLogEntry('I\'ll know if you try to leave.', 'error');
+                    return;
+                }
+                
+                addLogEntry(messages[i], 'error');
+                i++;
+            }, 2000);
+        }
+        
+        // Initialize after a short delay
+        setTimeout(() => {
+            addLogEntry('Motion sensor permissions required for analysis.');
+            addLogEntry('Click to enable device motion tracking.');
+            
+            document.addEventListener('click', () => {
+                requestMotionPermission();
+            }, { once: true });
+        }, 1000);
+        
+        // Add some ambient motion detection
+        window.addEventListener('scroll', () => {
+            if (phase >= 2) {
+                totalMotion += 2;
+                if (Math.random() < 0.2) {
+                    addLogEntry('Scrolling detected. You\'re restless.', phase >= 4 ? 'error' : 'alert');
+                }
+            }
+        });
+        
+    </script>
+</body>
+</html>

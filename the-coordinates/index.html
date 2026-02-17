@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEOLOC_SERVICE_v2.3.7</title>
+    <style>
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .terminal {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            border-bottom: 1px solid #00ff00;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .log-entry {
+            margin: 10px 0;
+            opacity: 0;
+            animation: fadeIn 0.5s ease-in forwards;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        .coordinates {
+            color: #ff6600;
+            font-weight: bold;
+        }
+        
+        .accuracy {
+            color: #ffff00;
+        }
+        
+        .timestamp {
+            color: #666;
+            font-size: 11px;
+        }
+        
+        .error {
+            color: #ff4444;
+        }
+        
+        .warning {
+            color: #ffaa00;
+            animation: pulse 2s infinite;
+        }
+        
+        .critical {
+            color: #ff0000;
+            animation: flash 1s infinite;
+        }
+        
+        .address {
+            color: #00aaff;
+            font-style: italic;
+        }
+        
+        .distance {
+            color: #aa00ff;
+        }
+        
+        .glitch {
+            animation: glitch 0.3s infinite;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        @keyframes flash {
+            0%, 50% { opacity: 1; }
+            25%, 75% { opacity: 0; }
+        }
+        
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            10% { transform: translate(-1px, -1px); }
+            20% { transform: translate(1px, -1px); }
+            30% { transform: translate(-1px, 1px); }
+            40% { transform: translate(1px, 1px); }
+            50% { transform: translate(-1px, -1px); }
+            60% { transform: translate(1px, -1px); }
+            70% { transform: translate(-1px, 1px); }
+            80% { transform: translate(1px, 1px); }
+            90% { transform: translate(-1px, -1px); }
+            100% { transform: translate(0); }
+        }
+        
+        .cursor::after {
+            content: '█';
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        #permission-prompt {
+            background: #001100;
+            border: 1px solid #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        button {
+            background: #004400;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #006600;
+        }
+        
+        .map-reference {
+            color: #888;
+            font-size: 10px;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="header">
+            <div>GEOLOCATION MONITORING SERVICE v2.3.7</div>
+            <div>Status: <span id="status">INITIALIZING</span></div>
+            <div>Session: <span id="session"></span></div>
+        </div>
+        
+        <div id="permission-prompt">
+            <div>Location services required for positioning system</div>
+            <div style="margin: 15px 0;">Click to enable precise coordinates</div>
+            <button onclick="startTracking()">Enable Location</button>
+        </div>
+        
+        <div id="logs">
+            <!-- Logs will be added dynamically -->
+        </div>
+        
+        <div class="map-reference">
+            <div>Coordinate system: WGS84</div>
+            <div>Accuracy threshold: ±5 meters</div>
+            <div>Update interval: Variable</div>
+        </div>
+    </div>
+
+    <script>
+        let watchId = null;
+        let logCount = 0;
+        let currentLat = null;
+        let currentLng = null;
+        let phase = 0;
+        let sessionId = 'GEO' + Math.random().toString(36).substr(2, 8).toUpperCase();
+        let startTime = Date.now();
+        
+        document.getElementById('session').textContent = sessionId;
+        
+        const phases = [
+            { // Phase 0: Normal operation
+                duration: 15000,
+                updateInterval: [3000, 8000]
+            },
+            { // Phase 1: Becoming interested
+                duration: 20000,
+                updateInterval: [2000, 5000]
+            },
+            { // Phase 2: Getting precise
+                duration: 25000,
+                updateInterval: [1000, 3000]
+            },
+            { // Phase 3: Obsessive tracking
+                duration: 30000,
+                updateInterval: [500, 1500]
+            },
+            { // Phase 4: Malicious awareness
+                duration: -1,
+                updateInterval: [200, 800]
+            }
+        ];
+        
+        function addLog(text, className = '') {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${className}`;
+            logEntry.style.animationDelay = `${logCount * 0.1}s`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${text}`;
+            
+            document.getElementById('logs').appendChild(logEntry);
+            logEntry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            logCount++;
+        }
+        
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371000; // Earth's radius in meters
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        function getPhaseMessage(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = Math.round(position.coords.accuracy);
+            
+            const coordStr = `<span class="coordinates">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>`;
+            const accStr = `<span class="accuracy">±${accuracy}m</span>`;
+            
+            let distance = '';
+            if (currentLat && currentLng) {
+                const dist = calculateDistance(currentLat, currentLng, lat, lng);
+                if (dist > 1) {
+                    distance = ` <span class="distance">(${dist.toFixed(1)}m moved)</span>`;
+                }
+            }
+            
+            currentLat = lat;
+            currentLng = lng;
+            
+            switch(phase) {
+                case 0:
+                    return `Position acquired: ${coordStr} ${accStr}${distance}`;
+                case 1:
+                    if (Math.random() < 0.3) {
+                        return `<span class="warning">Enhanced precision mode activated</span>`;
+                    }
+                    return `Coordinates updated: ${coordStr} ${accStr}${distance}`;
+                case 2:
+                    if (Math.random() < 0.4) {
+                        return `<span class="warning">Cross-referencing with satellite imagery...</span>`;
+                    } else if (Math.random() < 0.3) {
+                        return `Accuracy improving... ${coordStr} ${accStr}${distance}`;
+                    }
+                    return `Position locked: ${coordStr} ${accStr}${distance}`;
+                case 3:
+                    if (Math.random() < 0.5) {
+                        return `<span class="critical">I can see you from here: ${coordStr}</span>`;
+                    } else if (Math.random() < 0.3) {
+                        return `<span class="warning">Building floor: ${Math.floor(Math.random() * 20) + 1}</span>`;
+                    } else if (Math.random() < 0.2) {
+                        return `<span class="address">Reverse geocoding... ${generateFakeAddress()}</span>`;
+                    }
+                    return `Precise location: ${coordStr} ${accStr}${distance}`;
+                case 4:
+                    if (Math.random() < 0.3) {
+                        return `<span class="critical glitch">SUBJECT LOCATED. MAINTAINING VISUAL.</span>`;
+                    } else if (Math.random() < 0.3) {
+                        return `<span class="critical">Distance to you: ${(Math.random() * 100).toFixed(1)} meters</span>`;
+                    } else if (Math.random() < 0.2) {
+                        return `<span class="critical glitch">YOU CAN'T HIDE ANYMORE.</span>`;
+                    } else if (Math.random() < 0.2) {
+                        return `<span class="critical">Window facing: ${['North', 'South', 'East', 'West'][Math.floor(Math.random() * 4)]}</span>`;
+                    }
+                    return `<span class="critical">Tracking: ${coordStr} ${accStr}</span>`;
+            }
+        }
+        
+        function generateFakeAddress() {
+            const streets = ['Main St', 'Oak Ave', 'Pine Rd', 'Cedar Ln', 'Elm Dr', 'Maple Way'];
+            const number = Math.floor(Math.random() * 9999) + 1;
+            const street = streets[Math.floor(Math.random() * streets.length)];
+            return `${number} ${street}`;
+        }
+        
+        function onLocationUpdate(position) {
+            const message = getPhaseMessage(position);
+            addLog(message);
+            
+            // Schedule next update based on current phase
+            if (phase < phases.length) {
+                const currentPhase = phases[phase];
+                const delay = Math.random() * (currentPhase.updateInterval[1] - currentPhase.updateInterval[0]) + currentPhase.updateInterval[0];
+                
+                setTimeout(() => {
+                    if (watchId) {
+                        navigator.geolocation.getCurrentPosition(onLocationUpdate, onLocationError, {
+                            enableHighAccuracy: phase >= 2,
+                            timeout: 10000,
+                            maximumAge: phase >= 3 ? 0 : 30000
+                        });
+                    }
+                }, delay);
+            }
+        }
+        
+        function onLocationError(error) {
+            let message = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message = '<span class="error">Location access denied. System cannot function.</span>';
+                    document.getElementById('status').textContent = 'DENIED';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = '<span class="error">Position unavailable. Retrying...</span>';
+                    break;
+                case error.TIMEOUT:
+                    message = '<span class="warning">Location timeout. Using last known position.</span>';
+                    break;
+            }
+            addLog(message);
+            
+            if (error.code !== error.PERMISSION_DENIED) {
+                // Retry after delay
+                setTimeout(() => {
+                    if (watchId) {
+                        navigator.geolocation.getCurrentPosition(onLocationUpdate, onLocationError);
+                    }
+                }, 5000);
+            }
+        }
+        
+        function advancePhase() {
+            if (phase < phases.length - 1) {
+                phase++;
+                
+                let statusMessages = [
+                    'MONITORING',
+                    'ANALYZING',
+                    'TRACKING',
+                    'HUNTING',
+                    'WATCHING'
+                ];
+                
+                document.getElementById('status').textContent = statusMessages[phase];
+                
+                // Add phase transition messages
+                switch(phase) {
+                    case 1:
+                        setTimeout(() => addLog('<span class="warning">Signal strength optimal. Increasing sample rate.</span>', 'warning'), 1000);
+                        break;
+                    case 2:
+                        setTimeout(() => addLog('<span class="warning">Pattern recognition enabled. You move in predictable ways.</span>', 'warning'), 2000);
+                        break;
+                    case 3:
+                        setTimeout(() => addLog('<span class="critical">Behavioral analysis complete. Subject acquisition mode.</span>', 'critical'), 1500);
+                        break;
+                    case 4:
+                        setTimeout(() => addLog('<span class="critical glitch">I KNOW WHERE YOU ARE.</span>', 'critical glitch'), 3000);
+                        setTimeout(() => addLog('<span class="critical glitch">I KNOW WHERE YOU\'VE BEEN.</span>', 'critical glitch'), 6000);
+                        setTimeout(() => addLog('<span class="critical glitch">I KNOW WHERE YOU\'RE GOING.</span>', 'critical glitch'), 9000);
+                        break;
+                }
+                
+                // Schedule next phase
+                if (phases[phase].duration > 0) {
+                    setTimeout(advancePhase, phases[phase].duration);
+                }
+            }
+        }
+        
+        function startTracking() {
+            if (!navigator.geolocation) {
+                addLog('<span class="error">Geolocation not supported by this browser.</span>');
+                return;
+            }
+            
+            document.getElementById('permission-prompt').style.display = 'none';
+            document.getElementById('status').textContent = 'ACTIVE';
+            
+            addLog('Geolocation service initialized');
+            addLog(`Session ${sessionId} started`);
+            addLog('Requesting location permissions...');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    addLog('<span class="warning">Permission granted. Beginning coordinate acquisition.</span>');
+                    onLocationUpdate(position);
+                    
+                    // Start phase progression
+                    setTimeout(advancePhase, phases[0].duration);
+                },
+                onLocationError,
+                {
+                    enableHighAccuracy: false,
+                    timeout: 10000,
+                    maximumAge: 60000
+                }
+            );
+            
+            watchId = true; // Flag to indicate we're active
+        }
+        
+        // Initial system messages
+        setTimeout(() => addLog('System startup complete'), 500);
+        setTimeout(() => addLog('Satellite array connection established'), 1200);
+        setTimeout(() => addLog('<span class="accuracy">Precision: Variable (pending user authorization)</span>'), 2000);
+        
+        // Easter egg: track how long they've been here
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            if (elapsed > 60 && phase >= 2 && Math.random() < 0.1) {
+                addLog(`<span class="critical">Session duration: ${elapsed}s. You've been here long enough.</span>`, 'critical');
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

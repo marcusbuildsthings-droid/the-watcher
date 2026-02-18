@@ -241,7 +241,7 @@
                 </div>
                 <div class="status-line">
                     <span class="status-label">known pieces</span>
-                    <span class="status-value" id="known-pieces">0 / 19</span>
+                    <span class="status-value" id="known-pieces">0 / 23</span>
                 </div>
                 <div class="status-line" id="first-seen-row" style="display:none;">
                     <span class="status-label">first contact</span>
@@ -442,6 +442,15 @@
                     <span class="visits"></span>
                 </div>
             </a>
+
+            <a href="the-listener/" class="piece" data-piece="the-listener-v2">
+                <div class="piece-title">The Listener</div>
+                <div class="piece-description">A voice transcription tool. Speak freely. It starts helpful. But certain words trigger something. It's been listening for specific phrases.</div>
+                <div class="piece-meta">
+                    <span class="type">speech recognition / awareness</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
         </div>
 
         <div class="message hidden" id="personal-message"></div>
@@ -471,7 +480,7 @@
             
             document.getElementById('total-visits').textContent = state.totalVisits || 0;
             document.getElementById('known-pieces').textContent = 
-                `${state.visitedPieces.filter(p => p !== 'portal').length} / 22`;
+                `${state.visitedPieces.filter(p => p !== 'portal').length} / 23`;
             
             if (state.firstSeen) {
                 document.getElementById('first-seen-row').style.display = 'flex';

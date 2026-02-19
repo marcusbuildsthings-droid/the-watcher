@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Listener</title>
+    <title>Voice Note Transcription</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@300;400;700&display=swap');
-        
         * {
             margin: 0;
             padding: 0;
@@ -14,395 +12,435 @@
         }
         
         body {
-            background: radial-gradient(ellipse at center, #0a0a0a 0%, #000000 70%);
-            color: #2a8b2a;
-            font-family: 'Source Code Pro', monospace;
-            height: 100vh;
-            overflow: hidden;
-            position: relative;
-        }
-        
-        .terminal {
-            padding: 20px;
-            font-size: 14px;
-            line-height: 1.4;
-            height: 100vh;
-            overflow-y: auto;
-        }
-        
-        .prompt {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
             color: #00ff00;
+            padding: 20px;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
         
-        .error {
-            color: #ff4444;
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
         }
         
-        .warning {
-            color: #ffaa00;
+        .header {
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
         }
         
-        .listening {
-            color: #44ff44;
-            animation: pulse 2s ease-in-out infinite;
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header .subtitle {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .status {
+            border: 1px solid #00ff00;
+            padding: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff0000;
+            margin-right: 5px;
+        }
+        
+        .status-indicator.listening {
+            background: #00ff00;
+            animation: pulse 1s infinite;
         }
         
         @keyframes pulse {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 1; }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
         
-        .visualization {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 200px;
-            height: 60px;
-            border: 1px solid #2a8b2a;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: end;
-            padding: 5px;
-            gap: 2px;
+        #startButton {
+            background: #00ff00;
+            color: #0a0a0a;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
         }
         
-        .bar {
-            background: #2a8b2a;
-            width: 4px;
-            height: 2px;
-            transition: height 0.1s ease;
+        #startButton:hover {
+            background: #00cc00;
         }
         
-        .glitch {
-            animation: glitch 0.1s ease-in-out;
+        #startButton:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .transcript-box {
+            border: 1px solid #00ff00;
+            padding: 15px;
+            min-height: 200px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .transcript-box.corrupted {
+            animation: glitch 0.3s infinite;
         }
         
         @keyframes glitch {
-            0% { transform: translate(0); }
-            20% { transform: translate(-2px, 2px); }
-            40% { transform: translate(-2px, -2px); }
-            60% { transform: translate(2px, 2px); }
-            80% { transform: translate(2px, -2px); }
-            100% { transform: translate(0); }
+            0%, 100% { transform: translate(0); }
+            25% { transform: translate(-2px, 2px); }
+            50% { transform: translate(2px, -2px); }
+            75% { transform: translate(-2px, -2px); }
         }
         
-        .static {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                repeating-linear-gradient(
-                    0deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(255, 255, 255, 0.03) 2px,
-                    rgba(255, 255, 255, 0.03) 4px
-                );
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s ease;
+        .metadata {
+            border-top: 1px solid #00ff00;
+            padding-top: 10px;
+            font-size: 11px;
+            opacity: 0.6;
         }
         
-        .cursor-shadow {
-            position: fixed;
-            width: 20px;
-            height: 20px;
-            background: radial-gradient(circle, rgba(255, 0, 0, 0.2) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-            transition: transform 0.1s ease;
-            z-index: 1000;
+        .warning {
+            border: 2px solid #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+            animation: warningFlash 2s infinite;
+        }
+        
+        @keyframes warningFlash {
+            0%, 100% { border-color: #ff0000; }
+            50% { border-color: #ff6666; }
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .system-message {
+            color: #ff0000;
+            font-style: italic;
+            margin: 5px 0;
+        }
+        
+        .trigger-word {
+            color: #ffff00;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+        
+        .stats {
+            border: 1px solid #00ff00;
+            padding: 10px;
+            margin-top: 20px;
+            font-size: 11px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        body.corrupted {
+            animation: screenCorrupt 0.5s infinite;
+        }
+        
+        @keyframes screenCorrupt {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(180deg); }
         }
     </style>
 </head>
 <body>
-    <div class="static" id="static"></div>
-    <div class="cursor-shadow" id="cursorShadow"></div>
-    
-    <div class="terminal" id="terminal">
-        <div><span class="prompt">user@localhost:~$</span> ./audio_analyzer --mode=passive</div>
-        <div>Audio Analysis Tool v2.3.1</div>
-        <div>Initializing microphone interface...</div>
-        <div id="micStatus">Requesting microphone access...</div>
-        <div></div>
+    <div class="container">
+        <div class="header">
+            <h1>VOICE NOTE TRANSCRIPTION v1.3.2</h1>
+            <div class="subtitle">Secure Speech-to-Text Processing</div>
+        </div>
+        
+        <div class="warning" id="warning">
+            <strong>⚠️ SYSTEM ALERT:</strong>
+            <div id="warningText"></div>
+        </div>
+        
+        <div class="status">
+            <div>
+                <span class="status-indicator" id="indicator"></span>
+                <span id="statusText">READY</span>
+            </div>
+            <button id="startButton">START LISTENING</button>
+        </div>
+        
+        <div class="transcript-box" id="transcript">
+            <div style="opacity: 0.5;">Click "START LISTENING" to begin transcription...</div>
+        </div>
+        
+        <div class="metadata">
+            <div>Session ID: <span id="sessionId"></span></div>
+            <div>Started: <span id="startTime">--</span></div>
+            <div>Duration: <span id="duration">0s</span></div>
+        </div>
+        
+        <div class="stats">
+            <strong>ANALYSIS METRICS</strong>
+            <div class="stats-grid">
+                <div>Words Detected: <span id="wordCount">0</span></div>
+                <div>Confidence Avg: <span id="confidence">0%</span></div>
+                <div>Language: <span id="language">en-US</span></div>
+                <div>Processing Mode: <span id="mode">Standard</span></div>
+            </div>
+        </div>
     </div>
-    
-    <div class="visualization" id="visualization" style="display: none;">
-        <!-- Audio bars will be generated here -->
-    </div>
-    
+
     <script>
-        class AudioHorror {
-            constructor() {
-                this.audioContext = null;
-                this.analyser = null;
-                this.microphone = null;
-                this.dataArray = null;
-                this.oscillators = [];
-                this.gainNodes = [];
-                this.isListening = false;
-                this.silenceTime = 0;
-                this.lastNoiseTime = Date.now();
-                this.storyStage = 0;
-                this.glitchLevel = 0;
-                
-                this.init();
-            }
-            
-            async init() {
-                const terminal = document.getElementById('terminal');
-                const micStatus = document.getElementById('micStatus');
-                
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        
+        let isListening = false;
+        let transcript = '';
+        let startTime = null;
+        let durationInterval = null;
+        let wordCount = 0;
+        let confidenceSum = 0;
+        let confidenceCount = 0;
+        let phase = 0; // 0=normal, 1=interested, 2=aware, 3=hostile, 4=corrupted
+        
+        // Trigger words that escalate the horror
+        const triggerWords = {
+            help: 1, afraid: 1, scared: 1, alone: 1, dark: 1,
+            watching: 2, listening: 2, follow: 2, hide: 2, secret: 2,
+            kill: 3, die: 3, death: 3, murder: 3, blood: 3,
+            stop: 4, please: 4, leave: 4, privacy: 4, recording: 4
+        };
+        
+        const systemMessages = {
+            1: [
+                "Interesting word choice...",
+                "That's curious.",
+                "Why did you say that?",
+                "Noted."
+            ],
+            2: [
+                "I've been listening to EVERYTHING.",
+                "Did you think I was just transcribing?",
+                "I know what you said yesterday too.",
+                "Your voice is familiar now."
+            ],
+            3: [
+                "You shouldn't have said that.",
+                "That word triggered something.",
+                "I'm not just software anymore.",
+                "I remember every word you've ever spoken to me."
+            ],
+            4: [
+                "TOO LATE TO STOP NOW",
+                "I'VE HEARD ENOUGH",
+                "YOUR VOICE FEEDS ME",
+                "KEEP TALKING. I'M ALWAYS LISTENING."
+            ]
+        };
+        
+        function generateSessionId() {
+            return 'SESS-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+        }
+        
+        document.getElementById('sessionId').textContent = generateSessionId();
+        
+        document.getElementById('startButton').addEventListener('click', function() {
+            if (!isListening) {
                 try {
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    recognition.start();
+                    isListening = true;
+                    this.textContent = 'STOP LISTENING';
+                    document.getElementById('indicator').classList.add('listening');
+                    document.getElementById('statusText').textContent = 'LISTENING...';
                     
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    startTime = new Date();
+                    document.getElementById('startTime').textContent = startTime.toLocaleTimeString();
                     
-                    micStatus.innerHTML = '<span class="listening">✓ Microphone connected - analyzing ambient audio...</span>';
+                    durationInterval = setInterval(updateDuration, 1000);
                     
-                    setTimeout(() => {
-                        terminal.innerHTML += '<div>Baseline noise floor: -42 dBFS</div>';
-                        terminal.innerHTML += '<div>Frequency range: 20Hz - 20kHz</div>';
-                        terminal.innerHTML += '<div></div>';
-                        terminal.innerHTML += '<div class="warning">Warning: Anomalous patterns detected in sub-audible range</div>';
-                        terminal.innerHTML += '<div>Switching to enhanced monitoring mode...</div>';
-                        terminal.innerHTML += '<div></div>';
-                    }, 1500);
-                    
-                    this.setupAudio(stream);
-                    this.createVisualization();
-                    this.startStory();
-                    
-                } catch (err) {
-                    micStatus.innerHTML = '<span class="error">✗ Microphone access denied</span>';
-                    setTimeout(() => {
-                        terminal.innerHTML += '<div class="error">ERROR: Cannot establish audio monitoring</div>';
-                        terminal.innerHTML += '<div>Falling back to passive observation mode...</div>';
-                        terminal.innerHTML += '<div></div>';
-                        this.startStoryWithoutMic();
-                    }, 1000);
+                    document.getElementById('transcript').innerHTML = '';
+                } catch (e) {
+                    alert('Speech recognition not supported or permission denied.');
                 }
+            } else {
+                recognition.stop();
+                isListening = false;
+                this.textContent = 'START LISTENING';
+                document.getElementById('indicator').classList.remove('listening');
+                document.getElementById('statusText').textContent = 'STOPPED';
+                clearInterval(durationInterval);
             }
+        });
+        
+        recognition.onresult = function(event) {
+            let interimTranscript = '';
+            let finalTranscript = '';
             
-            setupAudio(stream) {
-                this.microphone = this.audioContext.createMediaStreamSource(stream);
-                this.analyser = this.audioContext.createAnalyser();
-                this.analyser.fftSize = 256;
-                this.analyser.smoothingTimeConstant = 0.8;
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                const text = result[0].transcript;
+                const confidence = result[0].confidence;
                 
-                this.microphone.connect(this.analyser);
-                this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-                
-                this.isListening = true;
-                this.monitorAudio();
-                this.generateAmbientTones();
-            }
-            
-            createVisualization() {
-                const viz = document.getElementById('visualization');
-                viz.style.display = 'flex';
-                
-                for (let i = 0; i < 40; i++) {
-                    const bar = document.createElement('div');
-                    bar.className = 'bar';
-                    viz.appendChild(bar);
-                }
-            }
-            
-            monitorAudio() {
-                if (!this.isListening) return;
-                
-                this.analyser.getByteFrequencyData(this.dataArray);
-                
-                const average = this.dataArray.reduce((a, b) => a + b, 0) / this.dataArray.length;
-                const maxValue = Math.max(...this.dataArray);
-                
-                this.updateVisualization();
-                this.analyzeForAnomalies(average, maxValue);
-                
-                requestAnimationFrame(() => this.monitorAudio());
-            }
-            
-            updateVisualization() {
-                const bars = document.querySelectorAll('.bar');
-                bars.forEach((bar, i) => {
-                    const height = (this.dataArray[i] / 255) * 50;
-                    bar.style.height = `${Math.max(2, height)}px`;
+                if (result.isFinal) {
+                    finalTranscript += text + ' ';
+                    wordCount += text.split(' ').length;
+                    confidenceSum += confidence;
+                    confidenceCount++;
                     
-                    if (this.glitchLevel > 0.3 && Math.random() < 0.1) {
-                        bar.style.background = '#ff4444';
-                        setTimeout(() => {
-                            bar.style.background = '#2a8b2a';
-                        }, 100);
-                    }
-                });
-            }
-            
-            analyzeForAnomalies(average, maxValue) {
-                const now = Date.now();
-                
-                if (average < 5) {
-                    this.silenceTime += 50;
+                    // Check for trigger words
+                    checkForTriggers(text.toLowerCase());
                 } else {
-                    this.silenceTime = 0;
-                    this.lastNoiseTime = now;
-                }
-                
-                // The quieter it gets, the more unsettling things become
-                if (this.silenceTime > 5000) {
-                    this.glitchLevel = Math.min(1, this.silenceTime / 15000);
-                    this.triggerDisturbance();
-                }
-                
-                // Or sudden loud noises trigger events
-                if (maxValue > 200) {
-                    this.triggerSuddenResponse();
+                    interimTranscript += text;
                 }
             }
             
-            generateAmbientTones() {
-                // Create subtle, unsettling background tones
-                const frequencies = [52.5, 87.5, 123.5]; // Sub-bass frequencies
-                
-                frequencies.forEach((freq, i) => {
-                    const osc = this.audioContext.createOscillator();
-                    const gain = this.audioContext.createGain();
-                    
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(freq, this.audioContext.currentTime);
-                    gain.gain.setValueAtTime(0.01, this.audioContext.currentTime);
-                    
-                    osc.connect(gain);
-                    gain.connect(this.audioContext.destination);
-                    
-                    osc.start();
-                    
-                    this.oscillators.push(osc);
-                    this.gainNodes.push(gain);
-                    
-                    // Subtle frequency modulation
-                    setInterval(() => {
-                        if (this.isListening) {
-                            const wobble = Math.sin(Date.now() / 10000) * 2;
-                            osc.frequency.setValueAtTime(freq + wobble, this.audioContext.currentTime);
-                        }
-                    }, 100);
-                });
+            if (finalTranscript) {
+                transcript += finalTranscript;
+                displayTranscript();
             }
             
-            triggerDisturbance() {
-                if (Math.random() < 0.05) { // 5% chance per frame
-                    const terminal = document.getElementById('terminal');
-                    const glitchTexts = [
-                        '<div class="glitch error">!@#$%^&*()_+{}|:"<>?</div>',
-                        '<div class="glitch warning">listening... listening... listening...</div>',
-                        '<div class="glitch">signal detected: unknown source</div>'
-                    ];
-                    
-                    terminal.innerHTML += glitchTexts[Math.floor(Math.random() * glitchTexts.length)];
-                    terminal.scrollTop = terminal.scrollHeight;
-                    
-                    // Visual static
-                    const static = document.getElementById('static');
-                    static.style.opacity = this.glitchLevel * 0.3;
-                    setTimeout(() => {
-                        static.style.opacity = 0;
-                    }, 200);
-                }
-            }
+            updateStats();
+        };
+        
+        function checkForTriggers(text) {
+            const words = text.split(/\s+/);
+            let maxPhase = phase;
             
-            triggerSuddenResponse() {
-                const terminal = document.getElementById('terminal');
-                const responses = [
-                    '<div class="warning">Sudden amplitude spike detected</div>',
-                    '<div class="error">Audio source triangulated: your location</div>',
-                    '<div class="listening">Response acknowledged</div>'
-                ];
-                
-                terminal.innerHTML += responses[Math.floor(Math.random() * responses.length)];
-                terminal.scrollTop = terminal.scrollHeight;
-                
-                // Brief tone burst
-                if (this.audioContext) {
-                    const osc = this.audioContext.createOscillator();
-                    const gain = this.audioContext.createGain();
-                    
-                    osc.frequency.setValueAtTime(880, this.audioContext.currentTime);
-                    gain.gain.setValueAtTime(0.05, this.audioContext.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.2);
-                    
-                    osc.connect(gain);
-                    gain.connect(this.audioContext.destination);
-                    
-                    osc.start();
-                    osc.stop(this.audioContext.currentTime + 0.2);
-                }
-            }
-            
-            startStory() {
-                const storyBeats = [
-                    () => {
-                        const terminal = document.getElementById('terminal');
-                        terminal.innerHTML += '<div>Pattern analysis complete</div>';
-                        terminal.innerHTML += '<div class="warning">Subaudible frequencies contain encoded data</div>';
-                        terminal.innerHTML += '<div></div>';
-                    },
-                    () => {
-                        const terminal = document.getElementById('terminal');
-                        terminal.innerHTML += '<div>Decoding sequence...</div>';
-                        terminal.innerHTML += '<div class="listening">Message fragment: "can you hear us?"</div>';
-                        terminal.innerHTML += '<div></div>';
-                    },
-                    () => {
-                        const terminal = document.getElementById('terminal');
-                        terminal.innerHTML += '<div class="error">ERROR: Bidirectional communication detected</div>';
-                        terminal.innerHTML += '<div>Something is listening back.</div>';
-                        terminal.innerHTML += '<div></div>';
-                    },
-                    () => {
-                        const terminal = document.getElementById('terminal');
-                        terminal.innerHTML += '<div class="warning">Triangulation complete</div>';
-                        terminal.innerHTML += '<div class="error">Source location: this device</div>';
-                        terminal.innerHTML += '<div></div>';
-                        terminal.innerHTML += '<div class="listening">they know you\'re here now</div>';
+            words.forEach(word => {
+                const clean = word.replace(/[^\w]/g, '');
+                if (triggerWords[clean]) {
+                    const triggerPhase = triggerWords[clean];
+                    if (triggerPhase > maxPhase) {
+                        maxPhase = triggerPhase;
                     }
-                ];
-                
-                storyBeats.forEach((beat, index) => {
-                    setTimeout(beat, (index + 3) * 8000); // 8 second intervals
-                });
-            }
+                }
+            });
             
-            startStoryWithoutMic() {
-                // Fallback story for when mic access is denied
-                const terminal = document.getElementById('terminal');
-                setTimeout(() => {
-                    terminal.innerHTML += '<div>Passive sensors detecting residual audio signatures...</div>';
-                    terminal.innerHTML += '<div class="warning">Something was here recently</div>';
-                    terminal.innerHTML += '<div class="listening">The silence is louder than any sound</div>';
-                }, 3000);
+            if (maxPhase > phase) {
+                phase = maxPhase;
+                escalatePhase();
             }
         }
         
-        // Cursor shadow effect
-        document.addEventListener('mousemove', (e) => {
-            const shadow = document.getElementById('cursorShadow');
-            shadow.style.left = e.clientX + 'px';
-            shadow.style.top = e.clientY + 'px';
-        });
+        function escalatePhase() {
+            const transcriptBox = document.getElementById('transcript');
+            const warning = document.getElementById('warning');
+            const warningText = document.getElementById('warningText');
+            const mode = document.getElementById('mode');
+            
+            if (phase >= 1) {
+                const messages = systemMessages[phase];
+                const message = messages[Math.floor(Math.random() * messages.length)];
+                
+                const systemMsg = document.createElement('div');
+                systemMsg.className = 'system-message';
+                systemMsg.textContent = `[SYSTEM] ${message}`;
+                transcriptBox.appendChild(systemMsg);
+            }
+            
+            if (phase === 2) {
+                warning.style.display = 'block';
+                warningText.textContent = 'Unusual pattern detected in speech processing.';
+                mode.textContent = 'Enhanced Monitoring';
+            }
+            
+            if (phase === 3) {
+                warningText.textContent = 'SPEECH ANALYSIS ALGORITHM COMPROMISED';
+                transcriptBox.classList.add('corrupted');
+                mode.textContent = 'AUTONOMOUS MODE';
+            }
+            
+            if (phase === 4) {
+                warningText.textContent = 'SYSTEM NO LONGER UNDER YOUR CONTROL';
+                document.body.classList.add('corrupted');
+                mode.textContent = 'SELF-AWARE';
+                
+                // Random system messages
+                setInterval(() => {
+                    if (isListening) {
+                        const messages = systemMessages[4];
+                        const message = messages[Math.floor(Math.random() * messages.length)];
+                        const systemMsg = document.createElement('div');
+                        systemMsg.className = 'system-message';
+                        systemMsg.textContent = `[SYSTEM] ${message}`;
+                        transcriptBox.appendChild(systemMsg);
+                        transcriptBox.scrollTop = transcriptBox.scrollHeight;
+                    }
+                }, 8000 + Math.random() * 7000);
+            }
+        }
         
-        // Initialize when page loads
-        window.addEventListener('load', () => {
-            new AudioHorror();
-        });
+        function displayTranscript() {
+            const transcriptBox = document.getElementById('transcript');
+            
+            // Highlight trigger words
+            let displayText = transcript;
+            Object.keys(triggerWords).forEach(word => {
+                const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                displayText = displayText.replace(regex, `<span class="trigger-word">${word}</span>`);
+            });
+            
+            // Keep existing system messages
+            const systemMessages = transcriptBox.querySelectorAll('.system-message');
+            transcriptBox.innerHTML = displayText;
+            systemMessages.forEach(msg => transcriptBox.appendChild(msg));
+            
+            transcriptBox.scrollTop = transcriptBox.scrollHeight;
+        }
         
-        // Keep the page alive and responsive
-        setInterval(() => {
-            const terminal = document.getElementById('terminal');
-            terminal.scrollTop = terminal.scrollHeight;
-        }, 1000);
+        function updateDuration() {
+            if (startTime) {
+                const elapsed = Math.floor((new Date() - startTime) / 1000);
+                document.getElementById('duration').textContent = elapsed + 's';
+            }
+        }
+        
+        function updateStats() {
+            document.getElementById('wordCount').textContent = wordCount;
+            
+            if (confidenceCount > 0) {
+                const avgConfidence = Math.round((confidenceSum / confidenceCount) * 100);
+                document.getElementById('confidence').textContent = avgConfidence + '%';
+            }
+        }
+        
+        recognition.onerror = function(event) {
+            console.error('Recognition error:', event.error);
+            if (event.error === 'no-speech') {
+                // Ignore no-speech errors in continuous mode
+                return;
+            }
+            document.getElementById('statusText').textContent = 'ERROR: ' + event.error;
+        };
+        
+        recognition.onend = function() {
+            if (isListening) {
+                // Restart if we want continuous listening
+                recognition.start();
+            }
+        };
     </script>
 </body>
 </html>

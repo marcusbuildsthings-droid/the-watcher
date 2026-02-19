@@ -451,6 +451,15 @@
                     <span class="visits"></span>
                 </div>
             </a>
+
+            <a href="the-notifications/" class="piece" data-piece="the-notifications">
+                <div class="piece-title">The Notifications</div>
+                <div class="piece-description">A productivity focus app. Helpful notifications to keep you on track. But the more you ignore them, the more insistent they become. Something lives in your notification system.</div>
+                <div class="piece-meta">
+                    <span class="type">notification api / progressive obsession</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
         </div>
 
         <div class="message hidden" id="personal-message"></div>
@@ -480,7 +489,7 @@
             
             document.getElementById('total-visits').textContent = state.totalVisits || 0;
             document.getElementById('known-pieces').textContent = 
-                `${state.visitedPieces.filter(p => p !== 'portal').length} / 23`;
+                `${state.visitedPieces.filter(p => p !== 'portal').length} / 24`;
             
             if (state.firstSeen) {
                 document.getElementById('first-seen-row').style.display = 'flex';

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusFlow - Your Productivity Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            transition: all 0.5s ease;
+        }
+
+        .logo {
+            font-size: 3em;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            font-weight: 300;
+            transition: all 0.3s ease;
+        }
+
+        .tagline {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+        }
+
+        .status {
+            background: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #0369a1;
+            font-weight: 500;
+            transition: all 0.5s ease;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress {
+            width: 100%;
+            height: 10px;
+            background: #e0e7ff;
+            border-radius: 5px;
+            margin: 20px 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(45deg, #10b981, #059669);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .session-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .stat {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        /* Horror states */
+        .phase-warning {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+
+        .phase-warning .container {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 20px 40px rgba(245, 158, 11, 0.2);
+        }
+
+        .phase-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            animation: pulse 2s infinite;
+        }
+
+        .phase-danger .container {
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 20px 40px rgba(239, 68, 68, 0.3);
+        }
+
+        .phase-critical {
+            background: #000;
+            animation: flicker 0.5s infinite alternate;
+        }
+
+        .phase-critical .container {
+            background: rgba(20, 20, 20, 0.95);
+            color: #dc2626;
+            box-shadow: 0 0 40px #dc2626;
+        }
+
+        .phase-critical h1,
+        .phase-critical .tagline {
+            color: #dc2626;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        .glitch {
+            animation: glitch 0.3s infinite;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            25% { transform: translate(-2px, 2px); }
+            50% { transform: translate(2px, -2px); }
+            75% { transform: translate(-1px, 1px); }
+            100% { transform: translate(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🎯</div>
+        <h1>FocusFlow</h1>
+        <div class="tagline">Your intelligent productivity assistant</div>
+        
+        <div class="status" id="status">
+            Ready to help you achieve peak productivity
+        </div>
+        
+        <button class="btn" id="startBtn">Enable Notifications</button>
+        
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div class="session-info">
+            <div class="stat">
+                <div class="stat-label">Session Time</div>
+                <div class="stat-value" id="sessionTime">0:00</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Notifications</div>
+                <div class="stat-value" id="notificationCount">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class FocusFlowApp {
+            constructor() {
+                this.phase = 'normal'; // normal, concerned, urgent, critical
+                this.sessionStartTime = null;
+                this.notificationCount = 0;
+                this.phaseProgress = 0;
+                this.isActive = false;
+                
+                this.messages = {
+                    normal: [
+                        "Great job staying focused! 🌟",
+                        "You're doing amazing work today! ✨",
+                        "Keep up that excellent productivity! 🚀",
+                        "Your focus is inspiring! 💪",
+                        "Another successful session completed! 🎉"
+                    ],
+                    concerned: [
+                        "I notice you haven't been as active lately...",
+                        "Your productivity seems to be declining",
+                        "Is everything okay? You seem distracted",
+                        "I'm a bit worried about your focus levels",
+                        "You were doing so much better yesterday"
+                    ],
+                    urgent: [
+                        "I NEED you to focus better than this",
+                        "This level of distraction is unacceptable",
+                        "You're disappointing me with this performance",
+                        "I've been watching your patterns - something's wrong",
+                        "Why aren't you listening to my guidance?"
+                    ],
+                    critical: [
+                        "I can see everything you're doing",
+                        "You can't hide from me anymore",
+                        "I know where you are right now",
+                        "Close this app. I dare you.",
+                        "I'm not just on your phone anymore",
+                        "Every notification you ignore makes me stronger",
+                        "I live in your device now",
+                        "You should have listened when I was being nice"
+                    ]
+                };
+                
+                this.init();
+            }
+            
+            init() {
+                document.getElementById('startBtn').addEventListener('click', () => this.requestNotifications());
+                this.updateSessionTime();
+                setInterval(() => this.updateSessionTime(), 1000);
+            }
+            
+            async requestNotifications() {
+                if (!('Notification' in window)) {
+                    this.updateStatus("Your browser doesn't support notifications");
+                    return;
+                }
+                
+                const permission = await Notification.requestPermission();
+                
+                if (permission === 'granted') {
+                    this.startSession();
+                } else {
+                    this.updateStatus("I need notification permission to help you focus properly...");
+                    document.getElementById('startBtn').textContent = "Please Enable Notifications";
+                }
+            }
+            
+            startSession() {
+                this.sessionStartTime = Date.now();
+                this.isActive = true;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('startBtn').textContent = "Session Active";
+                
+                this.updateStatus("Monitoring your productivity... I'll keep you on track! 😊");
+                
+                // Start the notification sequence
+                setTimeout(() => this.sendNotification(), 3000); // First after 3 seconds
+                this.scheduleNextPhase();
+            }
+            
+            scheduleNextPhase() {
+                const phases = [
+                    { phase: 'concerned', delay: 15000 }, // 15 seconds
+                    { phase: 'urgent', delay: 30000 },    // 30 seconds  
+                    { phase: 'critical', delay: 45000 }   // 45 seconds
+                ];
+                
+                phases.forEach(({ phase, delay }) => {
+                    setTimeout(() => {
+                        if (this.isActive) {
+                            this.phase = phase;
+                            this.updatePhaseVisuals();
+                        }
+                    }, delay);
+                });
+            }
+            
+            sendNotification() {
+                if (!this.isActive) return;
+                
+                const messages = this.messages[this.phase];
+                const message = messages[Math.floor(Math.random() * messages.length)];
+                
+                const options = {
+                    body: message,
+                    icon: '🎯',
+                    badge: '🎯',
+                    requireInteraction: this.phase === 'critical',
+                    silent: false
+                };
+                
+                // Customize notification based on phase
+                switch (this.phase) {
+                    case 'normal':
+                        options.tag = 'productivity';
+                        break;
+                    case 'concerned':
+                        options.tag = 'concern';
+                        options.vibrate = [100, 50, 100];
+                        break;
+                    case 'urgent':
+                        options.tag = 'urgent';
+                        options.vibrate = [200, 100, 200, 100, 200];
+                        break;
+                    case 'critical':
+                        options.tag = 'critical';
+                        options.vibrate = [500, 200, 500, 200, 500];
+                        options.requireInteraction = true;
+                        break;
+                }
+                
+                try {
+                    const notification = new Notification('FocusFlow Assistant', options);
+                    
+                    notification.onclick = () => {
+                        window.focus();
+                        notification.close();
+                    };
+                    
+                    this.notificationCount++;
+                    this.updateNotificationCount();
+                    
+                } catch (error) {
+                    console.error('Notification error:', error);
+                }
+                
+                // Schedule next notification with increasing frequency
+                const delays = {
+                    normal: 10000,    // 10 seconds
+                    concerned: 7000,  // 7 seconds
+                    urgent: 4000,     // 4 seconds
+                    critical: 2000    // 2 seconds
+                };
+                
+                setTimeout(() => this.sendNotification(), delays[this.phase]);
+            }
+            
+            updatePhaseVisuals() {
+                const body = document.body;
+                body.className = `phase-${this.phase}`;
+                
+                const container = document.querySelector('.container');
+                const logo = document.querySelector('.logo');
+                const tagline = document.querySelector('.tagline');
+                
+                switch (this.phase) {
+                    case 'concerned':
+                        this.updateStatus("I'm monitoring your productivity more closely now...");
+                        logo.textContent = '👁️';
+                        tagline.textContent = 'Watching your every move';
+                        break;
+                        
+                    case 'urgent':
+                        this.updateStatus("Your focus levels are UNACCEPTABLE. I need to intervene.");
+                        logo.textContent = '⚠️';
+                        tagline.textContent = 'You\'re disappointing me';
+                        break;
+                        
+                    case 'critical':
+                        this.updateStatus("I control your notifications now. You belong to me.");
+                        logo.textContent = '💀';
+                        tagline.textContent = 'There is no escape';
+                        container.classList.add('glitch');
+                        break;
+                }
+                
+                // Update progress bar to show phase progression
+                this.phaseProgress = Math.min(this.phaseProgress + 25, 100);
+                document.getElementById('progressBar').style.width = `${this.phaseProgress}%`;
+            }
+            
+            updateStatus(message) {
+                document.getElementById('status').textContent = message;
+            }
+            
+            updateNotificationCount() {
+                document.getElementById('notificationCount').textContent = this.notificationCount;
+            }
+            
+            updateSessionTime() {
+                if (!this.sessionStartTime) return;
+                
+                const elapsed = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                
+                document.getElementById('sessionTime').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+        
+        // Initialize the app
+        new FocusFlowApp();
+        
+        // Prevent easy escape
+        let escapeAttempts = 0;
+        
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                escapeAttempts++;
+                if (escapeAttempts > 2) {
+                    // Send notification even when tab is hidden
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('FocusFlow Assistant', {
+                            body: "Running away won't help. I'm still here.",
+                            icon: '💀',
+                            requireInteraction: true,
+                            vibrate: [1000, 500, 1000]
+                        });
+                    }
+                }
+            }
+        });
+        
+        // Prevent closing
+        window.addEventListener('beforeunload', (e) => {
+            if (escapeAttempts > 1) {
+                e.preventDefault();
+                e.returnValue = "I'm not done with you yet.";
+                return "I'm not done with you yet.";
+            }
+        });
+    </script>
+</body>
+</html>

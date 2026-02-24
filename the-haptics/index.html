@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Haptics</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 40px;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #00ff41;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #00ff41;
+            border-radius: 8px;
+            background: rgba(0, 255, 65, 0.1);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .controller-info {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            font-size: 0.9em;
+        }
+        
+        .button {
+            background: linear-gradient(145deg, #1a1a1a, #333);
+            border: 2px solid #00ff41;
+            color: #00ff41;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-family: inherit;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .button:hover {
+            background: rgba(0, 255, 65, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+        
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #333;
+            border-color: #666;
+            color: #666;
+        }
+        
+        .pattern-display {
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 1.2em;
+            letter-spacing: 0.1em;
+            color: #ff6b6b;
+            min-height: 30px;
+        }
+        
+        .warning {
+            color: #ff6b6b;
+            font-size: 0.9em;
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ff6b6b;
+            border-radius: 4px;
+            background: rgba(255, 107, 107, 0.1);
+        }
+        
+        .glitch {
+            animation: glitch 0.3s infinite linear alternate-reverse;
+        }
+        
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+        
+        .fade-out {
+            animation: fadeOut 3s ease-in-out forwards;
+        }
+        
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>THE HAPTICS</h1>
+        
+        <div class="status" id="status">
+            Connect a gamepad and click "Listen" to begin...
+        </div>
+        
+        <div id="controllers"></div>
+        
+        <button class="button" id="listenBtn" onclick="startListening()">Listen</button>
+        
+        <div class="pattern-display" id="pattern"></div>
+        
+        <div class="warning">
+            This experience uses gamepad vibration. Ensure your controller is connected and supports haptic feedback.
+        </div>
+    </div>
+
+    <script>
+        let isListening = false;
+        let controllers = {};
+        let sequence = [];
+        let currentPhase = 0;
+        let responseTimer = null;
+        let glitchTimer = null;
+        
+        // Haptic patterns for communication
+        const patterns = {
+            // Phase 1: Gentle contact
+            greeting: [
+                { strong: 0.2, weak: 0.1, duration: 200 },
+                { strong: 0, weak: 0, duration: 300 },
+                { strong: 0.2, weak: 0.1, duration: 200 }
+            ],
+            
+            // Phase 2: Asking questions
+            question: [
+                { strong: 0.4, weak: 0.2, duration: 100 },
+                { strong: 0, weak: 0, duration: 100 },
+                { strong: 0.4, weak: 0.2, duration: 100 },
+                { strong: 0, weak: 0, duration: 200 },
+                { strong: 0.6, weak: 0.3, duration: 300 }
+            ],
+            
+            // Phase 3: Urgency 
+            urgent: [
+                { strong: 0.8, weak: 0.4, duration: 150 },
+                { strong: 0.4, weak: 0.2, duration: 100 },
+                { strong: 0.8, weak: 0.4, duration: 150 },
+                { strong: 0.4, weak: 0.2, duration: 100 },
+                { strong: 1.0, weak: 0.5, duration: 500 }
+            ],
+            
+            // Phase 4: Desperation
+            desperate: [
+                { strong: 1.0, weak: 1.0, duration: 100 },
+                { strong: 0, weak: 0, duration: 50 },
+                { strong: 1.0, weak: 1.0, duration: 100 },
+                { strong: 0, weak: 0, duration: 50 },
+                { strong: 1.0, weak: 1.0, duration: 100 },
+                { strong: 0, weak: 0, duration: 50 },
+                { strong: 1.0, weak: 1.0, duration: 1000 }
+            ],
+            
+            // Special patterns
+            heartbeat: [
+                { strong: 0.6, weak: 0.3, duration: 80 },
+                { strong: 0, weak: 0, duration: 120 },
+                { strong: 0.8, weak: 0.4, duration: 100 },
+                { strong: 0, weak: 0, duration: 700 }
+            ],
+            
+            morse_sos: [
+                // S (...)
+                { strong: 0.5, weak: 0.3, duration: 150 },
+                { strong: 0, weak: 0, duration: 100 },
+                { strong: 0.5, weak: 0.3, duration: 150 },
+                { strong: 0, weak: 0, duration: 100 },
+                { strong: 0.5, weak: 0.3, duration: 150 },
+                { strong: 0, weak: 0, duration: 300 },
+                // O (---)
+                { strong: 0.8, weak: 0.4, duration: 450 },
+                { strong: 0, weak: 0, duration: 100 },
+                { strong: 0.8, weak: 0.4, duration: 450 },
+                { strong: 0, weak: 0, duration: 100 },
+                { strong: 0.8, weak: 0.4, duration: 450 },
+                { strong: 0, weak: 0, duration: 300 },
+                // S (...)
+                { strong: 0.5, weak: 0.3, duration: 150 },
+                { strong: 0, weak: 0, duration: 100 },
+                { strong: 0.5, weak: 0.3, duration: 150 },
+                { strong: 0, weak: 0, duration: 100 },
+                { strong: 0.5, weak: 0.3, duration: 150 }
+            ]
+        };
+        
+        // Story phases with timing
+        const storyPhases = [
+            {
+                pattern: 'greeting',
+                message: '• • •    (Something is trying to communicate)',
+                delay: 3000
+            },
+            {
+                pattern: 'heartbeat',
+                message: '•• — ••    (It has a heartbeat)',
+                delay: 8000
+            },
+            {
+                pattern: 'question',
+                message: '• • — — —    (It\'s asking something)',
+                delay: 6000
+            },
+            {
+                pattern: 'urgent',
+                message: '—— • —— • ——    (Growing impatient)',
+                delay: 5000
+            },
+            {
+                pattern: 'morse_sos',
+                message: '• • • —— —— —— • • •    (SOS... SOS... SOS)',
+                delay: 10000
+            },
+            {
+                pattern: 'desperate',
+                message: '—————————    (Please... help... trapped)',
+                delay: 4000
+            }
+        ];
+        
+        function updateStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+        
+        function updatePattern(text) {
+            document.getElementById('pattern').textContent = text;
+        }
+        
+        function updateControllerDisplay() {
+            const container = document.getElementById('controllers');
+            container.innerHTML = '';
+            
+            const gamepads = navigator.getGamepads();
+            let hasController = false;
+            
+            for (let i = 0; i < gamepads.length; i++) {
+                if (gamepads[i]) {
+                    hasController = true;
+                    const div = document.createElement('div');
+                    div.className = 'controller-info';
+                    div.textContent = `Controller ${i}: ${gamepads[i].id}`;
+                    container.appendChild(div);
+                    controllers[i] = gamepads[i];
+                }
+            }
+            
+            if (!hasController && isListening) {
+                updateStatus('No gamepad detected. Connect a controller and try again.');
+            }
+            
+            return hasController;
+        }
+        
+        async function playPattern(patternName) {
+            const pattern = patterns[patternName];
+            if (!pattern) return;
+            
+            for (let step of pattern) {
+                for (let id in controllers) {
+                    const gamepad = navigator.getGamepads()[id];
+                    if (gamepad && gamepad.vibrationActuator) {
+                        try {
+                            await gamepad.vibrationActuator.playEffect('dual-rumble', {
+                                startDelay: 0,
+                                duration: step.duration,
+                                weakMagnitude: step.weak,
+                                strongMagnitude: step.strong
+                            });
+                        } catch (e) {
+                            console.log('Vibration not supported');
+                        }
+                    }
+                }
+                
+                if (step.duration > 0) {
+                    await new Promise(resolve => setTimeout(resolve, step.duration));
+                }
+            }
+        }
+        
+        function startGlitchEffect() {
+            const container = document.querySelector('.container');
+            container.classList.add('glitch');
+            
+            glitchTimer = setInterval(() => {
+                if (Math.random() < 0.3) {
+                    document.body.style.filter = `hue-rotate(${Math.random() * 360}deg) saturate(${1 + Math.random()}`;
+                    setTimeout(() => {
+                        document.body.style.filter = 'none';
+                    }, 100);
+                }
+            }, 500);
+        }
+        
+        async function runSequence() {
+            updateStatus('Something is connecting...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            for (let i = 0; i < storyPhases.length; i++) {
+                if (!isListening) break;
+                
+                const phase = storyPhases[i];
+                currentPhase = i;
+                
+                // Start glitch effects in later phases
+                if (i >= 3 && !glitchTimer) {
+                    startGlitchEffect();
+                }
+                
+                updatePattern(phase.message);
+                await playPattern(phase.pattern);
+                
+                updateStatus(`Phase ${i + 1}: Entity communication detected...`);
+                
+                // Add increasing urgency
+                if (i >= 2) {
+                    const urgencyDelay = Math.max(1000, phase.delay - (i * 500));
+                    await new Promise(resolve => setTimeout(resolve, urgencyDelay));
+                } else {
+                    await new Promise(resolve => setTimeout(resolve, phase.delay));
+                }
+            }
+            
+            // Final desperate phase
+            if (isListening) {
+                updateStatus('Entity is becoming desperate...');
+                updatePattern('—————————————————————    (DON\'T LEAVE ME)');
+                
+                // Rapid desperate pulses
+                for (let i = 0; i < 10; i++) {
+                    if (!isListening) break;
+                    await playPattern('desperate');
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
+                
+                updateStatus('Connection lost...');
+                updatePattern('....................    (silence)');
+                
+                // One last heartbeat after 5 seconds
+                setTimeout(async () => {
+                    if (isListening) {
+                        await playPattern('heartbeat');
+                        updatePattern('•• — ••    (one last beat, then nothing)');
+                        
+                        // Fade out the interface
+                        document.querySelector('.container').classList.add('fade-out');
+                    }
+                }, 5000);
+            }
+        }
+        
+        function startListening() {
+            if (!updateControllerDisplay()) {
+                updateStatus('Please connect a gamepad first');
+                return;
+            }
+            
+            isListening = true;
+            document.getElementById('listenBtn').textContent = 'Stop';
+            document.getElementById('listenBtn').onclick = stopListening;
+            
+            updateStatus('Listening for haptic communication...');
+            runSequence();
+        }
+        
+        function stopListening() {
+            isListening = false;
+            currentPhase = 0;
+            
+            if (responseTimer) {
+                clearTimeout(responseTimer);
+                responseTimer = null;
+            }
+            
+            if (glitchTimer) {
+                clearInterval(glitchTimer);
+                glitchTimer = null;
+            }
+            
+            document.querySelector('.container').classList.remove('glitch');
+            document.body.style.filter = 'none';
+            
+            document.getElementById('listenBtn').textContent = 'Listen';
+            document.getElementById('listenBtn').onclick = startListening;
+            
+            updateStatus('Stopped listening.');
+            updatePattern('');
+        }
+        
+        // Gamepad connection events
+        window.addEventListener('gamepadconnected', (e) => {
+            updateControllerDisplay();
+            updateStatus(`Gamepad connected: ${e.gamepad.id}`);
+        });
+        
+        window.addEventListener('gamepaddisconnected', (e) => {
+            updateControllerDisplay();
+            updateStatus(`Gamepad disconnected`);
+        });
+        
+        // Initial setup
+        updateControllerDisplay();
+        
+        // Periodically check for controllers
+        setInterval(updateControllerDisplay, 1000);
+    </script>
+</body>
+</html>

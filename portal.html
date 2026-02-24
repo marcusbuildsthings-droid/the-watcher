@@ -241,7 +241,7 @@
                 </div>
                 <div class="status-line">
                     <span class="status-label">known pieces</span>
-                    <span class="status-value" id="known-pieces">0 / 23</span>
+                    <span class="status-value" id="known-pieces">0 / 24</span>
                 </div>
                 <div class="status-line" id="first-seen-row" style="display:none;">
                     <span class="status-label">first contact</span>
@@ -460,6 +460,15 @@
                     <span class="visits"></span>
                 </div>
             </a>
+
+            <a href="the-haptics/" class="piece" data-piece="the-haptics">
+                <div class="piece-title">The Haptics</div>
+                <div class="piece-description">Something is trying to communicate through your gamepad vibrations. Six phases of contact, from gentle greeting to desperate pleas. It speaks in haptic patterns. Can you understand what it's saying?</div>
+                <div class="piece-meta">
+                    <span class="type">gamepad api / haptic communication</span>
+                    <span class="visits"></span>
+                </div>
+            </a>
         </div>
 
         <div class="message hidden" id="personal-message"></div>
@@ -489,7 +498,7 @@
             
             document.getElementById('total-visits').textContent = state.totalVisits || 0;
             document.getElementById('known-pieces').textContent = 
-                `${state.visitedPieces.filter(p => p !== 'portal').length} / 24`;
+                `${state.visitedPieces.filter(p => p !== 'portal').length} / 25`;
             
             if (state.firstSeen) {
                 document.getElementById('first-seen-row').style.display = 'flex';

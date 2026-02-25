@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Drainer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .title {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            color: #ff6b6b;
+            text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+            animation: flicker 3s infinite;
+        }
+        
+        .status {
+            font-size: 1.2rem;
+            margin: 1rem 0;
+            color: #ffff99;
+        }
+        
+        .battery-display {
+            font-size: 3rem;
+            color: #ff4444;
+            margin: 2rem 0;
+            text-shadow: 0 0 30px rgba(255, 68, 68, 0.7);
+            transition: all 0.3s ease;
+        }
+        
+        .location-display {
+            font-size: 1rem;
+            color: #88ff88;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        
+        .warning {
+            color: #ff4444;
+            font-size: 1.1rem;
+            margin: 1rem 0;
+            animation: pulse 2s infinite;
+        }
+        
+        .distance {
+            font-size: 1.5rem;
+            color: #ff9900;
+            margin: 1rem 0;
+        }
+        
+        .btn {
+            background: rgba(255, 107, 107, 0.2);
+            border: 2px solid #ff6b6b;
+            color: #ff6b6b;
+            padding: 12px 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 8px;
+            margin: 1rem;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 107, 107, 0.3);
+            transform: scale(1.05);
+        }
+        
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 2px,
+                rgba(255, 255, 255, 0.03) 2px,
+                rgba(255, 255, 255, 0.03) 4px
+            );
+            opacity: 0;
+            pointer-events: none;
+            animation: noiseFlicker 0.1s infinite;
+            z-index: 1;
+        }
+        
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @keyframes noiseFlicker {
+            0% { opacity: 0; }
+            50% { opacity: 0.1; }
+            100% { opacity: 0; }
+        }
+        
+        .phase-1 .noise-overlay { opacity: 0.02; }
+        .phase-2 .noise-overlay { opacity: 0.05; }
+        .phase-3 .noise-overlay { opacity: 0.1; }
+        .phase-4 .noise-overlay { opacity: 0.2; animation-duration: 0.05s; }
+        
+        .glitch {
+            position: relative;
+        }
+        
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+        }
+        
+        .glitch::before {
+            animation: glitch1 0.3s infinite;
+            color: #ff0000;
+            z-index: -1;
+        }
+        
+        .glitch::after {
+            animation: glitch2 0.3s infinite;
+            color: #00ff00;
+            z-index: -2;
+        }
+        
+        @keyframes glitch1 {
+            0%, 100% { transform: translate(0); opacity: 0; }
+            20% { transform: translate(-2px, 2px); opacity: 0.8; }
+            40% { transform: translate(-2px, -2px); opacity: 0.8; }
+            60% { transform: translate(2px, 2px); opacity: 0.8; }
+            80% { transform: translate(2px, -2px); opacity: 0.8; }
+        }
+        
+        @keyframes glitch2 {
+            0%, 100% { transform: translate(0); opacity: 0; }
+            20% { transform: translate(2px, -2px); opacity: 0.6; }
+            40% { transform: translate(2px, 2px); opacity: 0.6; }
+            60% { transform: translate(-2px, -2px); opacity: 0.6; }
+            80% { transform: translate(-2px, 2px); opacity: 0.6; }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="noise-overlay"></div>
+    
+    <div class="container">
+        <h1 class="title">The Drainer</h1>
+        
+        <div id="intro" class="phase">
+            <p class="status">Something is watching your battery level.</p>
+            <p class="status">It knows where you are.</p>
+            <button class="btn" onclick="startTracking()">Check Battery Status</button>
+        </div>
+        
+        <div id="tracking" class="phase hidden">
+            <div class="battery-display" id="batteryLevel">--</div>
+            <div class="location-display" id="locationDisplay">
+                <div>Latitude: <span id="lat">--</span></div>
+                <div>Longitude: <span id="lng">--</span></div>
+                <div>Accuracy: <span id="accuracy">--</span>m</div>
+            </div>
+            <div class="distance" id="distance">Distance from entity: calculating...</div>
+            <div class="warning" id="warning">Battery draining faster than normal...</div>
+            <button class="btn" onclick="tryToEscape()">Try to Disconnect</button>
+        </div>
+    </div>
+
+    <script>
+        let batteryAPI = null;
+        let locationWatcher = null;
+        let drainInterval = null;
+        let phase = 0;
+        let entityLocation = { lat: 40.7128, lng: -74.0060 }; // Starts in NYC
+        let userLocation = null;
+        let originalBattery = null;
+        let drainRate = 0.002; // Start slow
+        let escapeAttempts = 0;
+
+        const messages = [
+            "It's getting closer...",
+            "The entity feeds on your power...",
+            "Distance decreasing... drain accelerating...",
+            "IT FOUND YOU",
+            "There is no escape. Only darkness."
+        ];
+
+        async function startTracking() {
+            document.getElementById('intro').classList.add('hidden');
+            document.getElementById('tracking').classList.remove('hidden');
+            
+            // Request location
+            if (navigator.geolocation) {
+                locationWatcher = navigator.geolocation.watchPosition(
+                    updateLocation,
+                    handleLocationError,
+                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+                );
+            }
+            
+            // Get battery info
+            if ('getBattery' in navigator) {
+                batteryAPI = await navigator.getBattery();
+                originalBattery = batteryAPI.level;
+                updateBatteryDisplay();
+                startDraining();
+            } else {
+                // Simulate battery for browsers without Battery API
+                originalBattery = 0.85;
+                simulateBattery();
+            }
+            
+            // Start the horror progression
+            setTimeout(() => advancePhase(), 3000);
+        }
+
+        function updateLocation(position) {
+            userLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                accuracy: position.coords.accuracy
+            };
+            
+            document.getElementById('lat').textContent = userLocation.lat.toFixed(6);
+            document.getElementById('lng').textContent = userLocation.lng.toFixed(6);
+            document.getElementById('accuracy').textContent = Math.round(userLocation.accuracy);
+            
+            updateDistance();
+            huntUser();
+        }
+
+        function handleLocationError(error) {
+            document.getElementById('locationDisplay').innerHTML = 
+                '<div style="color: #ff4444;">Location access denied. The entity will find you anyway...</div>';
+        }
+
+        function updateBatteryDisplay() {
+            if (batteryAPI) {
+                const percentage = Math.round(batteryAPI.level * 100);
+                document.getElementById('batteryLevel').textContent = percentage + '%';
+                
+                // Change color based on battery level
+                const display = document.getElementById('batteryLevel');
+                if (percentage < 20) {
+                    display.style.color = '#ff0000';
+                    display.style.textShadow = '0 0 30px rgba(255, 0, 0, 0.9)';
+                } else if (percentage < 50) {
+                    display.style.color = '#ff8800';
+                    display.style.textShadow = '0 0 30px rgba(255, 136, 0, 0.7)';
+                }
+            }
+        }
+
+        function simulateBattery() {
+            let currentLevel = originalBattery;
+            setInterval(() => {
+                currentLevel = Math.max(0, currentLevel - drainRate);
+                document.getElementById('batteryLevel').textContent = Math.round(currentLevel * 100) + '%';
+                
+                const display = document.getElementById('batteryLevel');
+                if (currentLevel < 0.2) {
+                    display.style.color = '#ff0000';
+                    display.style.textShadow = '0 0 30px rgba(255, 0, 0, 0.9)';
+                } else if (currentLevel < 0.5) {
+                    display.style.color = '#ff8800';
+                    display.style.textShadow = '0 0 30px rgba(255, 136, 0, 0.7)';
+                }
+                
+                if (currentLevel <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function startDraining() {
+            drainInterval = setInterval(() => {
+                if (batteryAPI && batteryAPI.level > 0) {
+                    // We can't actually drain the real battery, but we can simulate it
+                    updateBatteryDisplay();
+                }
+            }, 1000);
+        }
+
+        function updateDistance() {
+            if (!userLocation) return;
+            
+            const distance = calculateDistance(
+                userLocation.lat, userLocation.lng,
+                entityLocation.lat, entityLocation.lng
+            );
+            
+            document.getElementById('distance').textContent = 
+                `Distance from entity: ${distance.toFixed(1)} km`;
+            
+            // Increase drain rate as entity gets closer
+            const maxDistance = 20000; // 20,000 km (roughly half the Earth)
+            const proximity = Math.max(0, (maxDistance - distance) / maxDistance);
+            drainRate = 0.002 + (proximity * 0.01); // Drain faster when closer
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function huntUser() {
+            if (!userLocation) return;
+            
+            // Entity moves closer to user over time
+            const speed = 0.01; // Degrees per update
+            const latDiff = userLocation.lat - entityLocation.lat;
+            const lngDiff = userLocation.lng - entityLocation.lng;
+            
+            entityLocation.lat += latDiff * speed;
+            entityLocation.lng += lngDiff * speed;
+        }
+
+        function advancePhase() {
+            phase++;
+            document.body.className = `phase-${phase}`;
+            
+            if (phase <= messages.length) {
+                const warning = document.getElementById('warning');
+                warning.textContent = messages[phase - 1];
+                
+                if (phase >= 3) {
+                    warning.classList.add('glitch');
+                    warning.setAttribute('data-text', messages[phase - 1]);
+                }
+                
+                // Accelerate progression as phases advance
+                const nextDelay = Math.max(1000, 5000 - (phase * 1000));
+                if (phase < messages.length) {
+                    setTimeout(() => advancePhase(), nextDelay);
+                }
+            }
+            
+            if (phase === 4) {
+                // Critical phase - rapid battery drain
+                drainRate *= 5;
+            }
+        }
+
+        function tryToEscape() {
+            escapeAttempts++;
+            const button = event.target;
+            
+            const responses = [
+                "Connection failed. The entity holds on.",
+                "Escape attempt detected. Increasing drain.",
+                "You cannot run from what feeds on you.",
+                "The more you struggle, the hungrier it gets.",
+                "There is no disconnect. Only consumption."
+            ];
+            
+            button.textContent = responses[Math.min(escapeAttempts - 1, responses.length - 1)];
+            button.style.background = 'rgba(255, 0, 0, 0.3)';
+            button.style.borderColor = '#ff0000';
+            
+            // Each escape attempt makes things worse
+            drainRate *= 1.5;
+            advancePhase();
+            
+            if (escapeAttempts >= 3) {
+                button.disabled = true;
+                button.textContent = "No escape";
+                button.style.opacity = '0.5';
+            }
+        }
+
+        function endGame() {
+            document.body.style.background = '#000';
+            document.querySelector('.container').innerHTML = `
+                <div style="color: #ff0000; font-size: 3rem; text-align: center;">
+                    DRAINED
+                </div>
+                <div style="color: #666; font-size: 1rem; margin-top: 2rem; text-align: center;">
+                    The entity has consumed your device.<br>
+                    It now moves to the next target.<br><br>
+                    <span style="font-size: 0.8rem;">Refresh to experience again</span>
+                </div>
+            `;
+        }
+
+        // Auto-start draining after 10 seconds even without user interaction
+        setTimeout(() => {
+            if (!batteryAPI && originalBattery === null) {
+                console.log("Auto-starting simulation...");
+                startTracking();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
